@@ -1,13 +1,20 @@
 import { Network } from './network';
-import { Provider, QueryProvider, TxProvider } from '../provider';
+import {
+  Provider,
+  QueryProvider,
+  TxProvider,
+  handleSuiRpcError,
+} from '../provider';
 import { validateAccount } from '../utils/token';
 import { IStorage } from '../storage';
 import { Vault } from '../vault/Vault';
 import { Buffer } from 'buffer';
 import {
   CoinMetadata,
+  Connection,
   DryRunTransactionBlockResponse,
   ExecuteTransactionRequestType,
+  JsonRpcProvider,
   SignedMessage,
   SignedTransaction,
   SUI_SYSTEM_STATE_OBJECT_ID,
@@ -20,6 +27,8 @@ import {
 import { RpcError } from '../errors';
 import { SuiTransactionBlockResponseOptions } from '@mysten/sui.js/src/types';
 import { getTransactionBlock } from '../utils/txb-factory';
+import { AuthSig } from '@lit-protocol/types';
+import { PKPSuiWallet } from '@yhl125/pkp-sui';
 
 export const DEFAULT_SUPPORTED_COINS = new Map<string, CoinPackageIdPair>([
   [
@@ -162,6 +171,54 @@ export type GetReferencePriceParams = {
   network: Network;
 };
 
+export interface PKPTxEssentials {
+  network: Network;
+  authSig: AuthSig;
+  pkpPubKey: string;
+}
+
+export type PKPTransferCoinParams<E = PKPTxEssentials> = {
+  pkpContext: E;
+  coinType: string;
+  amount: string;
+  recipient: string;
+};
+
+export type PKPTransferObjectParams<E = PKPTxEssentials> = {
+  pkpContext: E;
+  recipient: string;
+  objectId: string;
+};
+
+export type PKPSignMessageParams<E = PKPTxEssentials> = {
+  pkpContext: E;
+  message: Uint8Array;
+};
+
+export type PKPSendAndExecuteTxParams<T, E = PKPTxEssentials> = {
+  pkpContext: E;
+  transactionBlock: T;
+  requestType?: ExecuteTransactionRequestType;
+  options?: SuiTransactionBlockResponseOptions;
+};
+
+export type PKPSendTxParams<T, E = PKPTxEssentials> = {
+  pkpContext: E;
+  transactionBlock: T;
+};
+
+export type PKPStakeCoinParams<E = PKPTxEssentials> = {
+  pkpContext: E;
+  amount: string;
+  validator: string; // address
+  gasBudgetForStake: number;
+};
+
+export type PKPDryRunTXBParams<T, E = PKPTxEssentials> = {
+  pkpContext: E;
+  transactionBlock: T;
+};
+
 export interface ITransactionApi {
   supportedCoins: () => Promise<CoinPackageIdPair[]>;
   transferCoin: (
@@ -209,6 +266,25 @@ export interface ITransactionApi {
   // unStakeCoin: (
   //   params: UnStakeCoinParams
   // ) => Promise<SuiExecuteTransactionResponse>;
+  pkpTransferCoin: (
+    params: PKPTransferCoinParams
+  ) => Promise<SuiTransactionBlockResponse>;
+  pkpTransferObject: (
+    params: PKPTransferObjectParams
+  ) => Promise<SuiTransactionBlockResponse>;
+  pkpSignMessage: (params: PKPSignMessageParams) => Promise<SignedMessage>;
+  pkpSignAndExecuteTransactionBlock: (
+    params: PKPSendAndExecuteTxParams<TransactionBlock>
+  ) => Promise<SuiTransactionBlockResponse>;
+  pkpSignTransactionBlock: (
+    params: PKPSendTxParams<TransactionBlock>
+  ) => Promise<SignedTransaction>;
+  pkpStakeCoin: (
+    params: PKPStakeCoinParams
+  ) => Promise<SuiTransactionBlockResponse>;
+  pkpDryRunTransactionBlock: (
+    params: PKPDryRunTXBParams<string | TransactionBlock>
+  ) => Promise<DryRunTransactionBlockResponse>;
 }
 
 export class TransactionApi implements ITransactionApi {
@@ -576,4 +652,137 @@ export class TransactionApi implements ITransactionApi {
   //     gasBudgetForStake
   //   );
   // }
+
+  PKPWallet(pkpContext: PKPTxEssentials) {
+    return new PKPSuiWallet(
+      {
+        controllerAuthSig: pkpContext.authSig,
+        pkpPubKey: pkpContext.pkpPubKey,
+      },
+      new JsonRpcProvider(
+        new Connection({ fullnode: pkpContext.network.txRpcUrl })
+      )
+    );
+  }
+
+  async pkpTransferCoin(
+    params: PKPTransferCoinParams
+  ): Promise<SuiTransactionBlockResponse> {
+    const pkpWallet = this.PKPWallet(params.pkpContext);
+    const address = await pkpWallet.getAddress();
+    const provider = new Provider(
+      params.pkpContext.network.queryRpcUrl,
+      params.pkpContext.network.txRpcUrl,
+      params.pkpContext.network.versionCacheTimoutInSeconds
+    );
+    const transactionBlock = await provider.getTransferCoinTxb(
+      params.coinType,
+      BigInt(params.amount),
+      params.recipient,
+      address
+    );
+    try {
+      return await pkpWallet.signAndExecuteTransactionBlock({
+        transactionBlock,
+      });
+    } catch (e) {
+      handleSuiRpcError(e);
+    }
+  }
+
+  async pkpTransferObject(params: PKPTransferObjectParams) {
+    const pkpWallet = this.PKPWallet(params.pkpContext);
+    const address = await pkpWallet.getAddress();
+    const provider = new QueryProvider(
+      params.pkpContext.network.queryRpcUrl,
+      params.pkpContext.network.versionCacheTimoutInSeconds
+    );
+    const object = await provider.getOwnedObject(address, params.objectId);
+    if (!object) {
+      throw new Error('No object to transfer');
+    }
+    const tx = new TransactionBlock();
+    tx.transferObjects([tx.object(params.objectId)], tx.pure(params.recipient));
+
+    try {
+      return await pkpWallet.signAndExecuteTransactionBlock({
+        transactionBlock: tx,
+      });
+    } catch (e) {
+      handleSuiRpcError(e);
+    }
+  }
+
+  async pkpSignMessage(params: PKPSignMessageParams) {
+    const pkpWallet = this.PKPWallet(params.pkpContext);
+    return await pkpWallet.signMessage({ message: params.message });
+  }
+
+  async pkpSignAndExecuteTransactionBlock(
+    params: PKPSendAndExecuteTxParams<string | TransactionBlock>
+  ) {
+    const pkpWallet = this.PKPWallet(params.pkpContext);
+    const txb = getTransactionBlock(params.transactionBlock);
+    try {
+      return await pkpWallet.signAndExecuteTransactionBlock({
+        transactionBlock: txb,
+        requestType: params.requestType,
+        options: params.options,
+      });
+    } catch (e) {
+      handleSuiRpcError(e);
+    }
+  }
+
+  async pkpSignTransactionBlock(
+    params: PKPSendTxParams<string | TransactionBlock>
+  ) {
+    const pkpWallet = this.PKPWallet(params.pkpContext);
+    return await pkpWallet.signTransactionBlock({
+      transactionBlock: getTransactionBlock(params.transactionBlock),
+    });
+  }
+
+  async pkpStakeCoin(params: PKPStakeCoinParams) {
+    const { amount, validator } = params;
+    const pkpWallet = this.PKPWallet(params.pkpContext);
+    const tx = new TransactionBlock();
+    const stakeCoin = tx.splitCoins(tx.gas, [tx.pure(amount)]);
+    tx.moveCall({
+      target: '0x3::sui_system::request_add_stake',
+      arguments: [
+        tx.object(SUI_SYSTEM_STATE_OBJECT_ID),
+        stakeCoin,
+        tx.pure(validator),
+      ],
+    });
+    try {
+      return await pkpWallet.signAndExecuteTransactionBlock({
+        transactionBlock: tx,
+      });
+    } catch (e) {
+      handleSuiRpcError(e);
+    }
+  }
+
+  async pkpDryRunTransactionBlock(
+    params: PKPDryRunTXBParams<string | TransactionBlock>
+  ) {
+    const pkpWallet = this.PKPWallet(params.pkpContext);
+    const txb = getTransactionBlock(params.transactionBlock);
+    let res: DryRunTransactionBlockResponse;
+
+    try {
+      res = await pkpWallet.dryRunTransactionBlock({
+        transactionBlock: txb,
+      });
+    } catch (e: any) {
+      handleSuiRpcError(e);
+    }
+    if (res?.effects?.status?.status === 'failure') {
+      const { status } = res.effects;
+      throw new RpcError(status.error ?? status.status, res);
+    }
+    return res;
+  }
 }
