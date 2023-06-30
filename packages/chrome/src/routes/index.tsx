@@ -53,6 +53,11 @@ const DappsPage = lazy(async () => await import('../pages/DappsPage'));
 const PasswordConfirmPage = lazy(
   async () => await import('../pages/PasswordConfirmPage')
 );
+const CreateLitPKPPage = lazy(async () =>
+  import('../pages/onboarding/CreateLitPKPPage').then((module) => ({
+    default: module.default,
+  }))
+);
 
 const routesConfig: RouteObject[] = [
   {
@@ -166,6 +171,10 @@ const routesConfig: RouteObject[] = [
       {
         path: 'import-wallet',
         element: withSus(<ImportWalletPage />),
+      },
+      {
+        path: 'create-pkp-wallet',
+        element: withSus(<CreateLitPKPPage />),
       },
     ],
   },
