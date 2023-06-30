@@ -58,14 +58,12 @@ function keepAlive() {
   });
 
   keepAlive();
-
   const bgApiProxy = new BackgroundApiProxy();
   const uiBgBridgeConnection = new ApiBridgeConnection(
     bgApiProxy,
     PortName.SUIET_UI_BACKGROUND
   );
   uiBgBridgeConnection.connect();
-
   const cntBgBridgeConnection = new ApiBridgeConnection(
     bgApiProxy,
     PortName.SUIET_CONTENT_BACKGROUND

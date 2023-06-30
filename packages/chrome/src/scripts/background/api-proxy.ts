@@ -6,6 +6,7 @@ import {
   NetworkApi,
   TransactionApi,
   WalletApi,
+  PKPRelayApi,
 } from '@suiet/core';
 import { fromEventPattern } from 'rxjs';
 import { CallFuncOption, PortName, resData } from '../shared';
@@ -40,6 +41,7 @@ export class BackgroundApiProxy {
   #txn: TransactionApi;
   #network: NetworkApi;
   #dapp: DappBgApi;
+  #pkpRelay: PKPRelayApi;
 
   constructor() {
     this.#registerServices();
@@ -114,6 +116,10 @@ export class BackgroundApiProxy {
         this.#account
       ),
       'dapp'
+    );
+    this.#pkpRelay = this.#registerProxyService<PKPRelayApi>(
+      new PKPRelayApi(),
+      'pkpRelay'
     );
     this.#root = this.#registerProxyService<RootApi>(
       ((ctx: any) => ({
