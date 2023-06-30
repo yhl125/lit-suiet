@@ -22,6 +22,9 @@ export default defineManifest((env) => ({
       run_at: 'document_start',
     },
   ],
+  content_security_policy: {
+    extension_pages: "script-src 'self' 'wasm-unsafe-eval';",
+  },
   web_accessible_resources: [
     {
       resources: ['dapp-api.js'],
