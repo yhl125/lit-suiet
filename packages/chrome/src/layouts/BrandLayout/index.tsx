@@ -15,7 +15,7 @@ const BrandLayout = (props: BrandLayoutProps) => {
   return (
     <div className={classnames(styles['main-page'])}>
       <Icon elClassName={styles['logo']} icon={<LogoGrey />} />
-      <Typo.Title className={classnames(styles['suiet-title'], 'mt-[64px]')}>
+      <Typo.Title className={classnames(styles['suiet-title'], 'mt-[14px]')}>
         {props.grayTitle}
       </Typo.Title>
       <Typo.Title
