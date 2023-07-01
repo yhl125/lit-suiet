@@ -13,6 +13,10 @@ import {
   startRegistration,
 } from '@simplewebauthn/browser';
 import { PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/typescript-types';
+import {
+  create,
+  parseCreationOptionsFromJSON,
+} from '@github/webauthn-json/browser-ponyfill';
 
 const LoginViews = {
   SIGN_UP: 'sign_up',
@@ -50,7 +54,6 @@ export default function Login() {
     event: React.FormEvent<HTMLFormElement>
   ) {
     event.preventDefault();
-    console.log('Create PKP With WebAuthn');
     setView(LoginViews.REGISTERING);
 
     try {
@@ -61,16 +64,16 @@ export default function Login() {
       );
 
       // Poll minting status
-      const attResp = await startRegistration(options);
+      const attResp = await create(parseCreationOptionsFromJSON(options));
       const pollRes = await apiClient.callFunc<any, any>(
-        'pkpRelay.verifyRegistration',
+        'pkpRelay.verifyAndMintPKPThroughRelayer',
         attResp
       );
       if (pollRes) {
         const newPKP = {
-          tokenId: pollRes.pkpTokenId!,
-          publicKey: pollRes.pkpPublicKey!,
-          ethAddress: pollRes.pkpEthAddress!,
+          tokenId: pollRes.pkpTokenId,
+          publicKey: pollRes.pkpPublicKey,
+          ethAddress: pollRes.pkpEthAddress,
         };
         setView(LoginViews.MINTED);
         dispatch(setPKP(newPKP));

@@ -1,21 +1,18 @@
-import { LitNodeClient } from '@lit-protocol/lit-node-client';
-import { ethers } from 'ethers';
-import {
-  startAuthentication,
-  startRegistration,
-} from '@simplewebauthn/browser';
+import { ethers, utils } from 'ethers';
+import { startAuthentication } from '@simplewebauthn/browser';
 import base64url from 'base64url';
 import {
   WebAuthnAuthenticationVerificationParams,
-  SignSessionKeyResponse,
-  IRelayPollStatusResponse,
+  IRelayMintResponse,
 } from '@lit-protocol/types';
-import { LitAuthClient, WebAuthnProvider } from '@lit-protocol/lit-auth-client';
-import { ProviderType } from '@lit-protocol/constants';
+import { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/typescript-types';
 import {
-  PublicKeyCredentialCreationOptionsJSON,
-  PublicKeyCredentialRequestOptionsJSON,
-} from '@simplewebauthn/typescript-types';
+  parseCreationOptionsFromJSON,
+  CredentialCreationOptionsJSON,
+} from '@github/webauthn-json/browser-ponyfill';
+import { hexlify, toUtf8Bytes } from 'ethers/lib/utils';
+import { AuthMethodType } from '@lit-protocol/constants';
+import { parseAuthenticatorData } from './lit-utils';
 
 export interface IPKPRelayApi {
   authenticate: () => Promise<WebAuthnAuthenticationVerificationParams>;
@@ -23,7 +20,7 @@ export interface IPKPRelayApi {
     authData: WebAuthnAuthenticationVerificationParams
   ) => Promise<any>;
   register: (username: string) => Promise<any>;
-  verifyRegistration: (attResp: any) => Promise<any>;
+  verifyAndMintPKPThroughRelayer: (attResp: any) => Promise<any>;
   pollRequestUntilTerminalState: (requestId: string) => Promise<any>;
   // getAuthSigForWebAuthn: (
   //   authData: WebAuthnAuthenticationVerificationParams
@@ -35,11 +32,12 @@ export class PKPRelayApi implements IPKPRelayApi {
     Date.now() + 1000 * 60 * 60 * 24 * 7
   ).toISOString();
 
-  private relayServerUrl = 'https://relay-server-staging.herokuapp.com';
-  // process.env.NEXT_PUBLIC_RELAY_API_URL ||
-  //! must not commit sercret key! //
-  private relayApiKey = 'test';
-  private rpcUrl = 'https://chain-rpc.litprotocol.com/http';
+  // LIT-Protocol/relay-server feature/lit-462-remove-verification-steps-from-relayer-required-before
+  private readonly relayServerUrl =
+    'http://ec2-13-212-154-129.ap-southeast-1.compute.amazonaws.com:3001';
+
+  private readonly relayApiKey = 'test';
+  private readonly rpcUrl = 'https://chain-rpc.litprotocol.com/http';
 
   // private litAuthClient = new LitAuthClient({
   //   litRelayConfig: {
@@ -63,52 +61,109 @@ export class PKPRelayApi implements IPKPRelayApi {
   // }
 
   async register(username: string) {
-    // Generate registration options for the browser to pass to a supported authenticator
-    let publicKeyCredentialCreationOptions = null;
-
-    let url = `https://lit-relay-helper.vercel.app/lit/register?username=${username}`;
+    const url = `https://lit-relay-helper.vercel.app/lit/register?username=${username}`;
     const response = await fetch(url, {
       method: 'GET',
     });
 
-    return response;
+    return this.registerResponseToCredentialCreationOptions(
+      await response.json()
+    );
   }
 
-  async verifyRegistration(attResp: any) {
+  registerResponseToCredentialCreationOptions(response: any) {
+    const creationOptionsJson = {
+      publicKey: {
+        ...response,
+        rp: {
+          name: response.rp.name,
+        },
+      },
+    };
+    return creationOptionsJson;
+  }
+
+  async verifyAndMintPKPThroughRelayer(attResp: any) {
     // Submit registration options to the authenticator
     // const attResp = await startRegistration(options);
     // Send the credential to the relying party for verification
-    let verificationJSON = null;
+    const authMethodId: string = this.generateAuthMethodId(attResp.rawId);
 
-    const response = await fetch(
-      `${this.relayServerUrl}/auth/webauthn/verify-registration`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'api-key': this.relayApiKey,
-        },
-        body: JSON.stringify({ credential: attResp }),
-      }
+    // create a buffer object from the base64 encoded content.
+    const attestationBuffer = Buffer.from(
+      attResp.response.attestationObject,
+      'base64'
     );
-    if (response.status < 200 || response.status >= 400) {
-      const errorJson = await response.json();
-      const errorMsg = errorJson.error || 'Unknown error';
-      const relayErr = new Error(`Unable to verify registration: ${errorMsg}`);
-      throw relayErr;
+
+    let publicKey: string;
+    try {
+      // parse the buffer to reconstruct the object.
+      // buffer is COSE formatted, utilities decode the buffer into json, and extract the public key information
+      const authenticationResponse: any =
+        parseAuthenticatorData(attestationBuffer);
+      // publickey in cose format to register the auth method
+      const publicKeyCoseBuffer: Buffer = authenticationResponse
+        .attestedCredentialData.credentialPublicKey as Buffer;
+      // Encode the publicKey for contract storage
+      publicKey = hexlify(ethers.utils.arrayify(publicKeyCoseBuffer));
+    } catch (e) {
+      throw new Error(
+        `Error while decoding credential create response for public key retrieval. attestation response not encoded as expected: ${e}`
+      );
     }
 
-    verificationJSON = await response.json();
-    // console.log('verificationJSON', verificationJSON);
-
+    const req = {
+      authMethodType: AuthMethodType.WebAuthn,
+      authMethodId,
+      authMethodPubKey: publicKey,
+    };
+    console.log('Minting input', req);
+    const mintRes = await this.mintPKP(
+      AuthMethodType.WebAuthn,
+      JSON.stringify(req)
+    );
+    if (!mintRes || !mintRes.requestId) {
+      throw new Error('Missing mint response or request ID from relay server');
+    }
     // If the credential was verified and registration successful, minting has kicked off
-    if (verificationJSON && verificationJSON.requestId) {
-      return verificationJSON.requestId;
-    } else {
-      const err = new Error(
-        `WebAuthn registration error: ${JSON.stringify(verificationJSON)}`
-      );
+    return mintRes.requestId;
+  }
+
+  private generateAuthMethodId(credentialRawId: string): string {
+    return utils.keccak256(toUtf8Bytes(`${credentialRawId}:lit`));
+  }
+
+  /**
+   * Mint a new PKP for the given auth method
+   *
+   * @param {AuthMethodType} authMethodType - Auth method type
+   * @param {string} body - Body of the request
+   *
+   * @returns {Promise<IRelayMintResponse>} Response from the relay server
+   */
+  public async mintPKP(
+    authMethodType: AuthMethodType,
+    body: string
+  ): Promise<IRelayMintResponse> {
+    const route = this._getMintPKPRoute(authMethodType);
+    const response = await fetch(`${this.relayServerUrl}${route}`, {
+      method: 'POST',
+      headers: {
+        'api-key': this.relayApiKey,
+        'Content-Type': 'application/json',
+      },
+      body,
+    });
+    console.log('Minting PKP with relay server', response);
+
+    if (response.status < 200 || response.status >= 400) {
+      console.warn('Something wrong with the API call', await response.json());
+      const err = new Error('Unable to mint PKP through relay server');
       throw err;
+    } else {
+      const resBody = await response.json();
+      console.log('Successfully initiated minting PKP with relayer');
+      return resBody;
     }
   }
 
@@ -144,7 +199,7 @@ export class PKPRelayApi implements IPKPRelayApi {
       }
 
       // otherwise, sleep then continue polling
-      await new Promise((r) => setTimeout(r, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 1000));
     }
 
     // At this point, polling ended and still no success, set failure status
@@ -163,13 +218,15 @@ export class PKPRelayApi implements IPKPRelayApi {
     const blockHashBytes = ethers.utils.arrayify(blockHash);
 
     // Construct authentication options.
-    const rpId = this.getDomainFromOrigin('localhost');
+    // const rpId = this.getDomainFromOrigin(
+    //   'https://lit-relay-helper.vercel.app'
+    // );
     // console.log('Using rpId: ', { rpId });
     const authenticationOptions: PublicKeyCredentialRequestOptionsJSON = {
       challenge: base64url(Buffer.from(blockHashBytes)),
       timeout: 60000,
       userVerification: 'preferred',
-      rpId,
+      // rpId,
     };
 
     // Authenticate with WebAuthn.
@@ -182,7 +239,7 @@ export class PKPRelayApi implements IPKPRelayApi {
     const actualAuthenticationResponse: WebAuthnAuthenticationVerificationParams =
       JSON.parse(JSON.stringify(authenticationResponse));
     actualAuthenticationResponse.response.userHandle = base64url.encode(
-      authenticationResponse.response.userHandle || ''
+      authenticationResponse.response.userHandle ?? ''
     );
 
     return actualAuthenticationResponse;
@@ -230,8 +287,31 @@ export class PKPRelayApi implements IPKPRelayApi {
 
   getDomainFromOrigin(origin: string) {
     // remove protocol with regex
-    let newOrigin = origin.replace(/(^\w+:|^)\/\//, '');
+    const newOrigin = origin.replace(/(^\w+:|^)\/\//, '');
     // remove port with regex
     return newOrigin.replace(/:\d+$/, '');
+  }
+
+  /**
+   * Get route for minting PKPs
+   *
+   * @param {AuthMethodType} authMethodType - Auth method type
+   *
+   * @returns {string} Minting route
+   */
+  private _getMintPKPRoute(authMethodType: AuthMethodType): string {
+    switch (authMethodType) {
+      case AuthMethodType.EthWallet:
+      case AuthMethodType.Discord:
+      case AuthMethodType.GoogleJwt:
+      case AuthMethodType.OTP:
+        return '/auth';
+      case AuthMethodType.WebAuthn:
+        return '/auth/webauthn/registration';
+      default:
+        throw new Error(
+          `Auth method type "${authMethodType}" is not supported`
+        );
+    }
   }
 }
