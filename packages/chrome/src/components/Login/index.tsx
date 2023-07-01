@@ -12,11 +12,11 @@ import {
   startAuthentication,
   startRegistration,
 } from '@simplewebauthn/browser';
-import { PublicKeyCredentialCreationOptionsJSON } from '@simplewebauthn/typescript-types';
-import {
-  create,
-  parseCreationOptionsFromJSON,
-} from '@github/webauthn-json/browser-ponyfill';
+import { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/typescript-types';
+import { create, get } from '@github/webauthn-json';
+import { parseCreationOptionsFromJSON } from '@github/webauthn-json/browser-ponyfill';
+import base64url from 'base64url';
+import { LitNodeClient } from '@lit-protocol/lit-node-client';
 
 const LoginViews = {
   SIGN_UP: 'sign_up',
@@ -95,11 +95,33 @@ export default function Login() {
     setView(LoginViews.AUTHENTICATING);
 
     try {
-      const authData = await apiClient.callFunc<
+      const authenticationOptions = await apiClient.callFunc<
         undefined,
-        WebAuthnAuthenticationVerificationParams
-      >('pkpRelay.authenticate', undefined);
+        PublicKeyCredentialRequestOptionsJSON
+      >('pkpRelay.authenticationOptions', undefined);
 
+      // Authenticate with WebAuthn.
+      const authenticationResponse = await startAuthentication(
+        authenticationOptions
+      );
+
+      // const a = await get();
+
+      // BUG: We need to make sure userHandle is base64url encoded.
+      // Deep copy the authentication response.
+      const authData: WebAuthnAuthenticationVerificationParams = JSON.parse(
+        JSON.stringify(authenticationResponse)
+      );
+      authData.response.userHandle = base64url.encode(
+        authenticationResponse.response.userHandle ?? ''
+      );
+      console.log('authData', authData);
+
+      // const pkps = await apiClient.callFunc<
+      //   WebAuthnAuthenticationVerificationParams,
+      //   any
+      // >('pkpRelay.fetchPKPs', authData);
+      // console.log('pkps', pkps);
       let pkpToAuthWith = pkpContext.currentPKP;
       if (!pkpToAuthWith) {
         // const pkps = await fetchPKPs(authData);
@@ -128,10 +150,11 @@ export default function Login() {
       //   litResource
       // );
 
-      const { authSig, pkpPublicKey } = await apiClient.callFunc<
-        WebAuthnAuthenticationVerificationParams,
-        SignSessionKeyResponse
-      >('pkpRelay.getAuthSigForWebAuthn', authData);
+      // const { authSig, pkpPublicKey } = await apiClient.callFunc<
+      //   WebAuthnAuthenticationVerificationParams,
+      //   SignSessionKeyResponse
+      // >('pkpRelay.getAuthSigForWebAuthn', authData);
+      const { authSig, pkpPublicKey } = await getAuthSigForWebAuthn(authData);
       console.log('authSig', authSig);
       console.log('pkpPublicKey', pkpPublicKey);
 
@@ -156,6 +179,31 @@ export default function Login() {
         onError(e.message);
       }
     }
+  }
+  const DEFAULT_EXP = new Date(
+    Date.now() + 1000 * 60 * 60 * 24 * 7
+  ).toISOString();
+
+  async function getAuthSigForWebAuthn(
+    authData: WebAuthnAuthenticationVerificationParams
+  ) {
+    const litNodeClient = new LitNodeClient({
+      litNetwork: 'serrano',
+      debug: false,
+    });
+    console.log('Lit node client');
+    await litNodeClient.connect();
+    console.log('Lit node client connected');
+
+    const authMethod = litNodeClient.generateAuthMethodForWebAuthn(authData);
+    console.log('Auth method', authMethod);
+    const signSessionKeyResponse = await litNodeClient.signSessionKey({
+      authMethods: [authMethod],
+      expiration: DEFAULT_EXP,
+      resources: [],
+    });
+    console.log('Sign session key response', signSessionKeyResponse);
+    return signSessionKeyResponse;
   }
 
   return (

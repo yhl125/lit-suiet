@@ -4,6 +4,7 @@ import base64url from 'base64url';
 import {
   WebAuthnAuthenticationVerificationParams,
   IRelayMintResponse,
+  SignSessionKeyResponse,
 } from '@lit-protocol/types';
 import { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/typescript-types';
 import {
@@ -13,18 +14,19 @@ import {
 import { hexlify, toUtf8Bytes } from 'ethers/lib/utils';
 import { AuthMethodType } from '@lit-protocol/constants';
 import { parseAuthenticatorData } from './lit-utils';
+import { LitNodeClient } from '@lit-protocol/lit-node-client';
 
 export interface IPKPRelayApi {
-  authenticate: () => Promise<WebAuthnAuthenticationVerificationParams>;
+  authenticationOptions: () => Promise<PublicKeyCredentialRequestOptionsJSON>;
   fetchPKPs: (
     authData: WebAuthnAuthenticationVerificationParams
   ) => Promise<any>;
   register: (username: string) => Promise<any>;
   verifyAndMintPKPThroughRelayer: (attResp: any) => Promise<any>;
   pollRequestUntilTerminalState: (requestId: string) => Promise<any>;
-  // getAuthSigForWebAuthn: (
-  //   authData: WebAuthnAuthenticationVerificationParams
-  // ) => Promise<SignSessionKeyResponse>;
+  getAuthSigForWebAuthn: (
+    authData: WebAuthnAuthenticationVerificationParams
+  ) => Promise<SignSessionKeyResponse>;
 }
 
 export class PKPRelayApi implements IPKPRelayApi {
@@ -208,7 +210,7 @@ export class PKPRelayApi implements IPKPRelayApi {
     throw err;
   }
 
-  async authenticate() {
+  async authenticationOptions() {
     const provider = new ethers.providers.JsonRpcProvider(this.rpcUrl);
 
     const block = await provider.getBlock('latest');
@@ -228,40 +230,30 @@ export class PKPRelayApi implements IPKPRelayApi {
       userVerification: 'preferred',
       // rpId,
     };
-
-    // Authenticate with WebAuthn.
-    const authenticationResponse = await startAuthentication(
-      authenticationOptions
-    );
-
-    // BUG: We need to make sure userHandle is base64url encoded.
-    // Deep copy the authentication response.
-    const actualAuthenticationResponse: WebAuthnAuthenticationVerificationParams =
-      JSON.parse(JSON.stringify(authenticationResponse));
-    actualAuthenticationResponse.response.userHandle = base64url.encode(
-      authenticationResponse.response.userHandle ?? ''
-    );
-
-    return actualAuthenticationResponse;
+    return authenticationOptions;
   }
 
-  // async getAuthSigForWebAuthn(
-  //   authData: WebAuthnAuthenticationVerificationParams
-  // ) {
-  //   const litNodeClient = new LitNodeClient({
-  //     litNetwork: 'serrano',
-  //     debug: false,
-  //   });
-  //   await litNodeClient.connect();
+  async getAuthSigForWebAuthn(
+    authData: WebAuthnAuthenticationVerificationParams
+  ) {
+    const litNodeClient = new LitNodeClient({
+      litNetwork: 'serrano',
+      debug: false,
+    });
+    console.log('Lit node client');
+    await litNodeClient.connect();
+    console.log('Lit node client connected');
 
-  //   const authMethod = litNodeClient.generateAuthMethodForWebAuthn(authData);
-  //   const signSessionKeyResponse = await litNodeClient.signSessionKey({
-  //     authMethods: [authMethod],
-  //     expiration: this.DEFAULT_EXP,
-  //     resources: [],
-  //   });
-  //   return signSessionKeyResponse;
-  // }
+    const authMethod = litNodeClient.generateAuthMethodForWebAuthn(authData);
+    console.log('Auth method', authMethod);
+    const signSessionKeyResponse = await litNodeClient.signSessionKey({
+      authMethods: [authMethod],
+      expiration: this.DEFAULT_EXP,
+      resources: [],
+    });
+    console.log('Sign session key response', signSessionKeyResponse);
+    return signSessionKeyResponse;
+  }
 
   async fetchPKPs(authData: WebAuthnAuthenticationVerificationParams) {
     const fetchRes = await fetch(
@@ -282,7 +274,7 @@ export class PKPRelayApi implements IPKPRelayApi {
       throw relayErr;
     }
     const fetchJSON = await fetchRes.json();
-    return fetchJSON.pkps;
+    return fetchJSON;
   }
 
   getDomainFromOrigin(origin: string) {
