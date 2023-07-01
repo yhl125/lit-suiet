@@ -13,8 +13,11 @@ import {
   startRegistration,
 } from '@simplewebauthn/browser';
 import { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/typescript-types';
-import { create, get } from '@github/webauthn-json';
-import { parseCreationOptionsFromJSON } from '@github/webauthn-json/browser-ponyfill';
+import {
+  create,
+  get,
+  parseCreationOptionsFromJSON,
+} from '@github/webauthn-json/browser-ponyfill';
 import base64url from 'base64url';
 import { LitNodeClient } from '@lit-protocol/lit-node-client';
 
