@@ -5,7 +5,7 @@ import { RootState } from '../../../store';
 import { browserSupportsWebAuthn } from '@simplewebauthn/browser';
 import { setUnAuthenticated } from '../../../store/pkp-context';
 
-import Login from '../../../components/Login/indext';
+import Login from '../../../components/Login';
 
 const CreatePKP = () => {
   const dispatch = useDispatch();
