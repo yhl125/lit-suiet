@@ -12,9 +12,12 @@ const Welcome = () => {
   function handleCreateNewWallet() {
     navigate('/onboard/create-new-wallet');
   }
-
   function handleImportWallet() {
     navigate('/onboard/import-wallet');
+  }
+
+  function handleCreatePKP() {
+    navigate('/onboard/create-new-pkp-wallet-google');
   }
 
   useEffectAdjustInitializedStatus(appContext);
@@ -31,11 +34,19 @@ const Welcome = () => {
       blackTitle={'Suiet'}
       desc={'The wallet for everyone.'}
     >
-      <section className={'mt-[77px] w-full flex justify-between'}>
+      <section className={'mt-[17px] w-full flex justify-between'}>
         <RectButton theme={'primary'} onClick={handleCreateNewWallet}>
           Create New
         </RectButton>
         <RectButton onClick={handleImportWallet}>Import Wallet</RectButton>
+      </section>
+      <section className={'mt-[7px] w-full flex justify-between'}>
+        <RectButton theme={'biometric'} onClick={handleCreatePKP}>
+          Create with Google
+        </RectButton>
+        <RectButton theme={'biometric-secondary'}>
+          Sign in with Google
+        </RectButton>
       </section>
     </BrandLayout>
   );

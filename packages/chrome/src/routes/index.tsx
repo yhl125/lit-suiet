@@ -34,6 +34,9 @@ const TransactionFlowPage = lazy(
 const TransactionDetail = lazy(
   async () => await import('../pages/TransactionFlow/transactionDetail')
 );
+const CreateNewPKPWalletGooglePage = lazy(
+  async () => await import('../pages/onboarding/CreatePKPWalletGoogle')
+);
 const CreateNewWalletPage = lazy(
   async () => await import('../pages/onboarding/CreateNewWalletPage')
 );
@@ -166,6 +169,10 @@ const routesConfig: RouteObject[] = [
       {
         path: 'import-wallet',
         element: withSus(<ImportWalletPage />),
+      },
+      {
+        path: 'create-new-pkp-wallet-google',
+        element: withSus(<CreateNewPKPWalletGooglePage />),
       },
     ],
   },
