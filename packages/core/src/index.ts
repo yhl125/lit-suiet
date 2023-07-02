@@ -18,6 +18,7 @@ export * from './api/account';
 export * from './api/auth';
 export * from './api/network';
 export * from './api/txn';
+export * from './api/pkp-google';
 export * from './provider';
 export * from './libs';
 export * from './utils';
