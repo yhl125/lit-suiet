@@ -50,7 +50,7 @@ const CreateNewPKPWalletGoogle = () => {
   const [recoveredAddress, setRecoveredAddress] = useState<string | null>(null);
   const [verified, setVerified] = useState(false);
 
-  const handleRedirect = useCallback(async () => {
+  const handleRedirect = async () => {
     setView(Views.HANDLE_REDIRECT);
     try {
       // Get Google ID token from redirect callback
@@ -68,7 +68,7 @@ const CreateNewPKPWalletGoogle = () => {
       setError(err);
       setView(Views.ERROR);
     }
-  }, [navigate]);
+  };
 
   async function mint() {
     setView(Views.MINTING);
@@ -234,10 +234,26 @@ const CreateNewPKPWalletGoogle = () => {
 
   function signInWithGoogle() {
     // Get login url
-    const loginUrl = getLoginUrl(REDIRECT_URI);
+    const redierct_uri = chrome.identity.getRedirectURL();
+    const loginUrl = getLoginUrl(redierct_uri);
     // Redirect to login url
-    chrome.windows.create({ url: loginUrl, focused: true });
+    chrome.identity
+      .launchWebAuthFlow({ interactive: true, url: loginUrl })
+      .then(async (res) => {
+        const id_token = extractAccessToken(res!);
+        setGoogleIdToken(id_token);
+        const pkps = await fetchGooglePKPs(id_token);
+        console.log(pkps);
+      });
+
+    // chrome.windows.create({ url: loginUrl, focused: true });
     // window.location.assign(loginUrl);
+  }
+  function extractAccessToken(url: string): string | null {
+    let m = url.match(/[#?](.*)/);
+    if (!m || m.length < 1) return null;
+    let params = new URLSearchParams(m[1].split('#')[0]);
+    return params.get('id_token');
   }
 
   /**
