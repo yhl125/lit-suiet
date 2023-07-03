@@ -1,20 +1,3 @@
-import { ethers, utils } from 'ethers';
-import { startAuthentication } from '@simplewebauthn/browser';
-import base64url from 'base64url';
-import {
-  WebAuthnAuthenticationVerificationParams,
-  IRelayMintResponse,
-  SignSessionKeyResponse,
-} from '@lit-protocol/types';
-import { PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/typescript-types';
-import {
-  parseCreationOptionsFromJSON,
-  CredentialCreationOptionsJSON,
-} from '@github/webauthn-json/browser-ponyfill';
-import { hexlify, toUtf8Bytes } from 'ethers/lib/utils';
-import { AuthMethodType } from '@lit-protocol/constants';
-import { LitNodeClient } from '@lit-protocol/lit-node-client';
-
 export interface IPKPRelayApi {
   fetchPKPs: (body: any) => Promise<any>;
   mintPKP: (body: any) => Promise<any>;
@@ -38,7 +21,7 @@ export class PKPGoogleApi implements IPKPRelayApi {
           'api-key': this.relayApiKey,
           'Content-Type': 'application/json',
         },
-        body: body,
+        body,
       }
     );
 
@@ -75,6 +58,7 @@ export class PKPGoogleApi implements IPKPRelayApi {
       return resBody;
     }
   }
+
   async pollRequestUntilTerminalState(requestId: string) {
     const maxPollCount = 20;
     for (let i = 0; i < maxPollCount; i++) {
@@ -116,7 +100,7 @@ export class PKPGoogleApi implements IPKPRelayApi {
       }
 
       // otherwise, sleep then continue polling
-      await new Promise((r) => setTimeout(r, 15000));
+      await new Promise((resolve) => setTimeout(resolve, 15000));
     }
 
     // at this point, polling ended and still no success, set failure status

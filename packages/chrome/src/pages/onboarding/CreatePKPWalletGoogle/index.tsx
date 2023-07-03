@@ -1,17 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import { LitNodeClient } from '@lit-protocol/lit-node-client';
-import { ethers } from 'ethers';
-import {
-  newSessionCapabilityObject,
-  LitAccessControlConditionResource,
-  LitAbility,
-} from '@lit-protocol/auth-helpers';
-import {
-  handleSignInRedirect,
-  isSignInRedirect,
-  getLoginUrl,
-} from '../../../utils/googleAuth';
+import { getLoginUrl } from '../../../utils/googleAuth';
 import { useApiClient } from '../../../hooks/useApiClient';
 import { SignSessionKeyResponse } from '@lit-protocol/types';
 
@@ -34,7 +23,6 @@ const Views = {
 
 const CreateNewPKPWalletGoogle = () => {
   const apiClient = useApiClient();
-  const navigate = useNavigate();
   const [view, setView] = useState(Views.SIGN_IN);
   const [error, setError] = useState<any>();
 
@@ -43,21 +31,17 @@ const CreateNewPKPWalletGoogle = () => {
   const [currentPKP, setCurrentPKP] = useState<IPKP>();
   const [authSigs, setAuthSigs] = useState<SignSessionKeyResponse>();
 
-  const [message, setMessage] = useState('Free the web!');
-  const [signature, setSignature] = useState<string>('');
-  const [recoveredAddress, setRecoveredAddress] = useState<string | null>(null);
-  const [verified, setVerified] = useState(false);
   const litNodeClient = new LitNodeClient({
     litNetwork: 'serrano',
     debug: false,
   });
 
-  const handleRedirect = async (id_token: string) => {
+  const handleRedirect = async (idToken: string) => {
     setView(Views.HANDLE_REDIRECT);
     try {
       // Fetch PKPs associated with Google account
       setView(Views.FETCHING);
-      const pkps = await fetchGooglePKPs(id_token);
+      const pkps = await fetchGooglePKPs(idToken);
       if (pkps.length > 0) {
         setPKPs(pkps);
       }
@@ -130,27 +114,27 @@ const CreateNewPKPWalletGoogle = () => {
 
   function signInWithGoogle() {
     // Get login url
-    const redierct_uri = chrome.identity.getRedirectURL();
-    const loginUrl = getLoginUrl(redierct_uri);
+    const redierctUri = chrome.identity.getRedirectURL();
+    const loginUrl = getLoginUrl(redierctUri);
     // Redirect to login url
     chrome.identity
       .launchWebAuthFlow({ interactive: true, url: loginUrl })
       .then(async (res) => {
-        try {
-          const id_token = extractAccessToken(res!);
-          setGoogleIdToken(id_token!);
-          handleRedirect(id_token!);
-        } catch {
-          throw Error(`id_token doesn't exist`);
+        if (!res) {
+          throw Error(`res doesn't exist`);
         }
-
-        console.log(pkps);
+        const idToken = extractAccessToken(res);
+        if (!idToken) {
+          throw Error(`idToken doesn't exist`);
+        }
+        setGoogleIdToken(idToken);
+        handleRedirect(idToken);
       });
   }
   function extractAccessToken(url: string): string | null {
-    let m = url.match(/[#?](.*)/);
+    const m = url.match(/[#?](.*)/);
     if (!m || m.length < 1) return null;
-    let params = new URLSearchParams(m[1].split('#')[0]);
+    const params = new URLSearchParams(m[1].split('#')[0]);
     return params.get('id_token');
   }
 
@@ -164,7 +148,7 @@ const CreateNewPKPWalletGoogle = () => {
   async function fetchGooglePKPs(idToken: string | null) {
     // Fetch PKPs associated with Google OAuth
     const body = JSON.stringify({
-      idToken: idToken,
+      idToken,
     });
     // const fetchRes = await fetchPKPs(body);
     const fetchRes = await apiClient.callFunc<any, any>(
@@ -188,7 +172,7 @@ const CreateNewPKPWalletGoogle = () => {
   async function mintGooglePKP(idToken: string) {
     // Mint a new PKP via relay server
     const body = JSON.stringify({
-      idToken: idToken,
+      idToken,
     });
     // const mintRes = await mintPKP(body);
     const mintRes = await apiClient.callFunc<any, any>(
