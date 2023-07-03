@@ -15,7 +15,7 @@ function MainPage() {
     (state: RootState) => state.appContext
   );
   let address: string;
-  if (usePKP) {
+  if (usePKP === true) {
     address = usePKPWallet().address;
   } else {
     address = useAccount(accountId).address;

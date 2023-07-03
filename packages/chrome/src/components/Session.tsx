@@ -25,7 +25,7 @@ const Session = (props: Extendable) => {
   }
 
   useEffect(() => {
-    if (usePKP) return;
+    if (usePKP === true) return;
     if (!authed) {
       const ac = new AbortController();
       authenticate(ac.signal).catch(() => {});
@@ -36,7 +36,7 @@ const Session = (props: Extendable) => {
   }, [isSetuped]);
 
   useEffect(() => {
-    if (usePKP) return;
+    if (usePKP === true) return;
     const controller = new AbortController();
     verifyAuthStatus(controller);
     return () => {

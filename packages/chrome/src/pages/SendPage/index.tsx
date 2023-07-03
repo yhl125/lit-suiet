@@ -29,7 +29,9 @@ import { getTransactionBlock } from '@suiet/core/src/utils/txb-factory';
 import createTransferCoinTxb, {
   createPKPTransferCoinTxb,
 } from './utils/createTransferCoinTxb';
-import useGasBudgetForTransferCoin from './hooks/useGasBudgetForTranferCoin';
+import useGasBudgetForTransferCoin, {
+  usePKPGasBudgetForTransferCoin,
+} from './hooks/useGasBudgetForTranferCoin';
 import useCoinsWithSuiOnTop from './hooks/useCoinsWithSuiOnTop';
 import { useGetAddress } from '../../hooks/usePKPWallet';
 import { pkpSignAndExecuteTransactionBlock } from '../../api/pkp/pkpSigns';
@@ -61,15 +63,24 @@ const SendPage = () => {
     coinAmountWithDecimals: '0',
   });
 
-  const { data: gasBudget } = useGasBudgetForTransferCoin({
-    coinType: sendData.coinType,
-    recipient: sendData.recipientAddress,
-    network,
-    walletId,
-    accountId,
-    gasFeeRatio: 1.2,
-  });
-
+  let gasBudget: number;
+  if (usePKP === true) {
+    gasBudget = usePKPGasBudgetForTransferCoin({
+      coinType: sendData.coinType,
+      recipient: sendData.recipientAddress,
+      network,
+      gasFeeRatio: 1.2,
+    }).data;
+  } else {
+    gasBudget = useGasBudgetForTransferCoin({
+      coinType: sendData.coinType,
+      recipient: sendData.recipientAddress,
+      network,
+      walletId,
+      accountId,
+      gasFeeRatio: 1.2,
+    }).data;
+  }
   const submitTransaction = useCallback(async () => {
     if (!sendData.recipientAddress || !sendData.coinType) return;
     if (!network) throw new Error('network is undefined');
