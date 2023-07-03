@@ -6,7 +6,6 @@ import { SignSessionKeyResponse } from '@lit-protocol/types';
 import { AppDispatch } from '../../../store';
 import { useDispatch } from 'react-redux';
 import {
-  updateAuthed,
   updateInitialized,
   updateNetworkId,
   updateUsePKP,
@@ -14,11 +13,6 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useFeatureFlags } from '../../../hooks/useFeatureFlags';
 
-interface IPKP {
-  tokenId: string;
-  ethAddress: string;
-  publicKey: string;
-}
 const Views = {
   SIGN_IN: 'sign_in',
   FETCHING: 'fetching',
@@ -31,15 +25,13 @@ const Views = {
   HANDLE_REDIRECT: 'handle-redirect',
 };
 
-const CreateNewPKPWalletGoogle = () => {
+const CreatePKPWalletGoogle = () => {
   const apiClient = useApiClient();
   const navigate = useNavigate();
   const [view, setView] = useState(Views.SIGN_IN);
   const [error, setError] = useState<any>();
 
   const [googleIdToken, setGoogleIdToken] = useState<string>('');
-  const [pkps, setPKPs] = useState<IPKP[]>([]);
-  const [currentPKP, setCurrentPKP] = useState<IPKP>();
   const [authSigs, setAuthSigs] = useState<SignSessionKeyResponse>();
   const dispatch = useDispatch<AppDispatch>();
   const featureFlags = useFeatureFlags();
@@ -55,11 +47,13 @@ const CreateNewPKPWalletGoogle = () => {
       // Fetch PKPs associated with Google account
       setView(Views.FETCHING);
       const pkps = await fetchGooglePKPs(idToken);
+      if (pkps.length === 0) {
+        await mint(idToken);
+      }
       if (pkps.length > 0) {
-        setPKPs(pkps);
+        await createSession(pkps[0], idToken);
       }
       setView(Views.FETCHED);
-      await mint(idToken);
     } catch (err) {
       setError(err);
       setView(Views.ERROR);
@@ -131,6 +125,7 @@ const CreateNewPKPWalletGoogle = () => {
       ethAddress: pollRes.pkpEthAddress,
       publicKey: pollRes.pkpPublicKey,
     };
+    console.log('newPKP', newPKP);
     return newPKP;
   }
 
@@ -141,21 +136,11 @@ const CreateNewPKPWalletGoogle = () => {
       // Mint new PKP
       const newPKP = await mintGooglePKP(idToken);
 
-      // Add new PKP to list of PKPs
-      const morePKPs = [...pkps, newPKP];
-      setPKPs(morePKPs);
-
       setView(Views.MINTED);
       setView(Views.CREATING_SESSION);
 
       // Get session sigs for new PKP
       await createSession(newPKP, idToken);
-      dispatch(updateInitialized(true));
-      dispatch(updateUsePKP(true));
-      dispatch(updateNetworkId(featureFlags?.default_network ?? 'devnet'));
-
-      setView(Views.SESSION_CREATED);
-      navigate('/home');
     } catch (err) {
       setError(err);
       setView(Views.ERROR);
@@ -186,12 +171,17 @@ const CreateNewPKPWalletGoogle = () => {
         resources: [],
       });
 
-      setCurrentPKP(pkp);
       setAuthSigs(signSessionKey);
-      const wallet = await apiClient.callFunc<SignSessionKeyResponse, string>(
+      await apiClient.callFunc<SignSessionKeyResponse, string>(
         'wallet.createPKPWallet',
         signSessionKey
       );
+      dispatch(updateInitialized(true));
+      dispatch(updateUsePKP(true));
+      dispatch(updateNetworkId(featureFlags?.default_network ?? 'devnet'));
+
+      setView(Views.SESSION_CREATED);
+      navigate('/home');
     } catch (err) {
       setError(err);
       setView(Views.ERROR);
@@ -364,4 +354,4 @@ const CreateNewPKPWalletGoogle = () => {
   );
 };
 
-export default CreateNewPKPWalletGoogle;
+export default CreatePKPWalletGoogle;
