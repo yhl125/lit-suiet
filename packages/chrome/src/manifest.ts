@@ -3,7 +3,7 @@ import { version } from './package-json';
 
 export default defineManifest((env) => ({
   manifest_version: 3,
-  name: 'Suiet | Sui Wallet',
+  name: 'Lit-Suiet | Sui Wallet',
   description: 'The Sui wallet for everyone, built on Sui blockchain',
   version,
   version_name: version,
@@ -11,7 +11,7 @@ export default defineManifest((env) => ({
     '128': 'logo.png',
   },
   action: { default_popup: 'index.html' },
-  permissions: ['storage'],
+  permissions: ['storage', 'tabs', 'identity'],
   background: {
     service_worker: 'src/scripts/background/index.ts',
   },
@@ -22,6 +22,9 @@ export default defineManifest((env) => ({
       run_at: 'document_start',
     },
   ],
+  content_security_policy: {
+    extension_pages: "script-src 'self' 'wasm-unsafe-eval';",
+  },
   web_accessible_resources: [
     {
       resources: ['dapp-api.js'],
