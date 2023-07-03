@@ -12,6 +12,8 @@ import {
 } from '../../../store/app-context';
 import { useNavigate } from 'react-router-dom';
 import { useFeatureFlags } from '../../../hooks/useFeatureFlags';
+import Nav from '../../../components/Nav';
+import Button from '../../../components/Button';
 
 const Views = {
   SIGN_IN: 'sign_in',
@@ -29,8 +31,9 @@ const CreatePKPWalletGoogle = () => {
   const apiClient = useApiClient();
   const navigate = useNavigate();
   const [view, setView] = useState(Views.SIGN_IN);
+  const [googleLoading, setGoogleLoading] = useState<boolean>(false);
   const [error, setError] = useState<any>();
-
+  const [disableNav, setDiableNav] = useState<boolean>(false);
   const [googleIdToken, setGoogleIdToken] = useState<string>('');
   const [authSigs, setAuthSigs] = useState<SignSessionKeyResponse>();
   const dispatch = useDispatch<AppDispatch>();
@@ -45,6 +48,7 @@ const CreatePKPWalletGoogle = () => {
     setView(Views.HANDLE_REDIRECT);
     try {
       // Fetch PKPs associated with Google account
+      setDiableNav(true);
       setView(Views.FETCHING);
       const pkps = await fetchGooglePKPs(idToken);
       if (pkps.length === 0) {
@@ -131,7 +135,6 @@ const CreatePKPWalletGoogle = () => {
 
   async function mint(idToken: string) {
     setView(Views.MINTING);
-
     try {
       // Mint new PKP
       const newPKP = await mintGooglePKP(idToken);
@@ -189,6 +192,7 @@ const CreatePKPWalletGoogle = () => {
   }
 
   function signInWithGoogle() {
+    setGoogleLoading(true);
     // Get login url
     const redierctUri = chrome.identity.getRedirectURL();
     const loginUrl = getLoginUrl(redierctUri);
@@ -205,7 +209,9 @@ const CreatePKPWalletGoogle = () => {
         }
         setGoogleIdToken(idToken);
         handleRedirect(idToken);
-      });
+        setGoogleLoading(false);
+      })
+      .catch((error) => setGoogleLoading(false));
   }
   function extractAccessToken(url: string): string | null {
     const m = url.match(/[#?](.*)/);
@@ -216,6 +222,11 @@ const CreatePKPWalletGoogle = () => {
 
   return (
     <div>
+      <Nav
+        title={'Sign With Google'}
+        navDisabled={disableNav}
+        onNavBack={() => navigate('/onboard/welcome')}
+      />
       {view === Views.ERROR && (
         <div className="error m-4">
           <svg
@@ -273,9 +284,9 @@ const CreatePKPWalletGoogle = () => {
             no more extensions.
           </p>
           <div className="px-6 sm:px-0 max-w-sm">
-            <button
+            <Button
+              loading={googleLoading}
               onClick={signInWithGoogle}
-              type="button"
               className="text-white w-full  bg-[#4285F4] hover:bg-[#4285F4]/90 focus:ring-4 focus:outline-none focus:ring-[#4285F4]/50 font-medium rounded-lg text-sm px-5 py-2.5 text-center inline-flex items-center justify-between dark:focus:ring-[#4285F4]/55 mr-2 mb-2"
             >
               <svg
@@ -294,7 +305,7 @@ const CreatePKPWalletGoogle = () => {
                 ></path>
               </svg>
               Sign in with Google<div></div>
-            </button>
+            </Button>
           </div>
         </div>
       )}
