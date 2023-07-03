@@ -8,7 +8,9 @@ import LockPage from '../pages/LockPage';
 import { useBiometricAuth } from '../hooks/useBiometricAuth';
 
 const Session = (props: Extendable) => {
-  const authed = useSelector((state: RootState) => state.appContext.authed);
+  const { authed, usePKP } = useSelector(
+    (state: RootState) => state.appContext
+  );
   const dispatch = useDispatch();
   const apiClient = useApiClient();
   const { isSetuped, authenticate } = useBiometricAuth();
@@ -23,6 +25,7 @@ const Session = (props: Extendable) => {
   }
 
   useEffect(() => {
+    if (usePKP) return;
     if (!authed) {
       const ac = new AbortController();
       authenticate(ac.signal).catch(() => {});
@@ -33,6 +36,7 @@ const Session = (props: Extendable) => {
   }, [isSetuped]);
 
   useEffect(() => {
+    if (usePKP) return;
     const controller = new AbortController();
     verifyAuthStatus(controller);
     return () => {
@@ -40,7 +44,7 @@ const Session = (props: Extendable) => {
     };
   }, []);
 
-  if (!authed) return <LockPage />;
+  if (!usePKP && !authed) return <LockPage />;
   return <>{props.children}</>;
 };
 
