@@ -1,5 +1,4 @@
-import { SignSessionKeyResponse } from '@lit-protocol/types';
-import { Account, Wallet, GlobalMeta } from './types';
+import { Account, Wallet, GlobalMeta, PKPWallet } from './types';
 
 export default interface IStorage {
   getWallets: () => Promise<Wallet[]>;
@@ -29,10 +28,8 @@ export default interface IStorage {
   clearMeta: () => Promise<void>;
   updateMetaAndWallets: (meta: GlobalMeta, wallets: Wallet[]) => Promise<void>;
 
-  addPKPSignSessionKeyResponse: (
-    response: SignSessionKeyResponse
-  ) => Promise<void>;
-  getPKPSignSessionKeyResponse: () => Promise<SignSessionKeyResponse | null>;
+  addPKPWallet: (wallet: PKPWallet) => Promise<void>;
+  getPKPWallet: () => Promise<PKPWallet | null>;
 
   reset: () => Promise<void>;
 }

@@ -1,4 +1,4 @@
-import { Account, GlobalMeta, Wallet } from './types';
+import { Account, GlobalMeta, PKPWallet, Wallet } from './types';
 import IStorage from './IStorage';
 import indexeddbMigrations, { MigrationMethod } from './migrations/indexeddb';
 import {
@@ -9,7 +9,6 @@ import {
   GLOBAL_PKP_ID,
   StoreName,
 } from './constants';
-import { SignSessionKeyResponse } from '@lit-protocol/types';
 
 export class IndexedDBStorage implements IStorage {
   private readonly connection: Promise<IDBDatabase>;
@@ -393,16 +392,14 @@ export class IndexedDBStorage implements IStorage {
     );
   }
 
-  async addPKPSignSessionKeyResponse(
-    response: SignSessionKeyResponse
-  ): Promise<void> {
+  async addPKPWallet(wallet: PKPWallet): Promise<void> {
     return await this.connection.then(
       async (db) =>
         await new Promise((resolve, reject) => {
           const request = db
             .transaction([StoreName.PKP_WALLET], 'readwrite')
             .objectStore(StoreName.PKP_WALLET)
-            .put({ ...response, id: GLOBAL_PKP_ID });
+            .put({ ...wallet, id: GLOBAL_PKP_ID });
 
           request.onsuccess = (event) => {
             resolve();
@@ -414,7 +411,7 @@ export class IndexedDBStorage implements IStorage {
     );
   }
 
-  async getPKPSignSessionKeyResponse(): Promise<SignSessionKeyResponse | null> {
+  async getPKPWallet(): Promise<PKPWallet | null> {
     return await this.connection.then(
       async (db) =>
         await new Promise((resolve, reject) => {
