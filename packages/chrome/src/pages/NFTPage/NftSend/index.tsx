@@ -61,7 +61,7 @@ export default function SendNft() {
 
     setSendLoading(true);
     try {
-      if (appContext.usePKP) {
+      if (appContext.usePKP === true) {
         await pkpTransferObject(
           {
             network,

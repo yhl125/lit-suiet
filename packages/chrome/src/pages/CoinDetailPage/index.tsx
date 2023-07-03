@@ -30,6 +30,7 @@ import { createUnstakeTransaction } from '../StakingPage/utils';
 import useCoins from '../../hooks/coin/useCoins';
 import { isSuiToken } from '../../utils/check';
 import { useGetAddress } from '../../hooks/usePKPWallet';
+import { pkpSignAndExecuteTransactionBlock } from '../../api/pkp/pkpSigns';
 
 export default function CoinDetailPage() {
   const appContext = useSelector((state: RootState) => state.appContext);
@@ -91,21 +92,31 @@ export default function CoinDetailPage() {
 
       const tx = createUnstakeTransaction(stakeObjectID);
       // tx.setGasBudget(700_000_000);
-      await apiClient.callFunc<
-        SendAndExecuteTxParams<string, OmitToken<TxEssentials>>,
-        undefined
-      >(
-        'txn.signAndExecuteTransactionBlock',
-        {
-          transactionBlock: tx.serialize(),
-          context: {
+      if (appContext.usePKP === true) {
+        await pkpSignAndExecuteTransactionBlock(
+          {
+            transactionBlock: tx,
             network,
-            walletId: appContext.walletId,
-            accountId: appContext.accountId,
           },
-        },
-        { withAuth: true }
-      );
+          apiClient
+        );
+      } else {
+        await apiClient.callFunc<
+          SendAndExecuteTxParams<string, OmitToken<TxEssentials>>,
+          undefined
+        >(
+          'txn.signAndExecuteTransactionBlock',
+          {
+            transactionBlock: tx.serialize(),
+            context: {
+              network,
+              walletId: appContext.walletId,
+              accountId: appContext.accountId,
+            },
+          },
+          { withAuth: true }
+        );
+      }
       message.success('Unstake SUI succeeded');
       navigate('/transaction/flow');
     } catch (e: any) {

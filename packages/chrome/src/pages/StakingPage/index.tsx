@@ -26,25 +26,28 @@ import { createStakeTransaction } from './utils';
 import useSuiBalance from '../../hooks/coin/useSuiBalance';
 import { SUI_TYPE_ARG } from '@mysten/sui.js';
 import { useGetAddress } from '../../hooks/usePKPWallet';
+import { pkpSignAndExecuteTransactionBlock } from '../../api/pkp/pkpSigns';
 
 export default function StackingPage() {
   const apiClient = useApiClient();
   const appContext = useSelector((state: RootState) => state.appContext);
   const { data: network } = useNetwork(appContext.networkId);
   const [selectedValidator, setSelectedValidator] = useState<string>();
-  const { loading, error, data } = useQuery(GET_VALIDATORS, {
+  const { loading, data } = useQuery(GET_VALIDATORS, {
     fetchPolicy: 'cache-and-network',
   });
   const validators = data?.validators || [];
   useEffect(() => {
     setSelectedValidator(validators[0]?.suiAddress);
   }, [validators]);
-  const currentValidator = validators.find((validator) => {
-    if (validator.suiAddress === selectedValidator) {
-      return true;
+  const currentValidator = validators.find(
+    (validator: { suiAddress: string }) => {
+      if (validator.suiAddress === selectedValidator) {
+        return true;
+      }
+      return false;
     }
-    return false;
-  });
+  );
   const [amount, setAmount] = useState('0');
   const [buttonLoading, setButtonLoading] = useState(false);
 
@@ -66,9 +69,7 @@ export default function StackingPage() {
   //   });
 
   const address = useGetAddress(appContext.usePKP, appContext.accountId);
-  const { data: suiBalance, loading: balanceLoading } = useSuiBalance(
-    address ?? ''
-  );
+  const { data: suiBalance } = useSuiBalance(address ?? '');
   const featureFlags = useFeatureFlagsWithNetwork();
   const gasBudget = featureFlags?.stake_gas_budget ?? 20_000_000;
 
@@ -97,21 +98,31 @@ export default function StackingPage() {
         BigInt(stakeSUIAmount),
         selectedValidator
       );
-      await apiClient.callFunc<
-        SendAndExecuteTxParams<string, OmitToken<TxEssentials>>,
-        undefined
-      >(
-        'txn.signAndExecuteTransactionBlock',
-        {
-          transactionBlock: tx.serialize(),
-          context: {
+      if (appContext.usePKP === true) {
+        await pkpSignAndExecuteTransactionBlock(
+          {
+            transactionBlock: tx,
             network,
-            walletId: appContext.walletId,
-            accountId: appContext.accountId,
           },
-        },
-        { withAuth: true }
-      );
+          apiClient
+        );
+      } else {
+        await apiClient.callFunc<
+          SendAndExecuteTxParams<string, OmitToken<TxEssentials>>,
+          undefined
+        >(
+          'txn.signAndExecuteTransactionBlock',
+          {
+            transactionBlock: tx.serialize(),
+            context: {
+              network,
+              walletId: appContext.walletId,
+              accountId: appContext.accountId,
+            },
+          },
+          { withAuth: true }
+        );
+      }
       message.success('Stake SUI succeeded');
       navigate('/transaction/flow');
     } catch (e: any) {

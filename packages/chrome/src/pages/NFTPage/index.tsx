@@ -54,10 +54,10 @@ function MainPage() {
       return;
     }
     const tx = getMintExampleNftTxBlock(featureFlags.sample_nft_object_id);
-    if (appContext.usePKP) {
+    if (appContext.usePKP === true) {
       await pkpSignAndExecuteTransactionBlock(
         {
-          transactionBlock: tx.serialize(),
+          transactionBlock: tx,
           network,
         },
         apiClient
