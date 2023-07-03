@@ -17,7 +17,6 @@
     "buffer": "6.0.3",
     "elliptic": "6.5.4",
     "@lit-protocol/lit-node-client": "^2.2.14",
-    "@lit-protocol/lit-auth-client": "^2.1.14",
     "fast-text-encoding": "1.0.4",
     "jayson": "3.6.6",
     "js-crypto-hmac": "1.0.4",

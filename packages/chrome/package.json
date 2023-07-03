@@ -40,7 +40,6 @@
     "crypto-hash": "2.0.1",
     "dayjs": "1.11.5",
     "detect-browser": "5.3.0",
-    "ethers": "5.7.2",
     "nanoid": "^4.0.1",
     "graphql": "16.6.0",
     "lodash-es": "4.17.21",
