@@ -44,7 +44,7 @@ export class PKPGoogleApi implements IPKPRelayApi {
         'api-key': this.relayApiKey,
         'Content-Type': 'application/json',
       },
-      body: body,
+      body,
     });
 
     if (response.status < 200 || response.status >= 400) {

@@ -3,6 +3,9 @@ import { LitNodeClient } from '@lit-protocol/lit-node-client';
 import { getLoginUrl } from '../../../utils/googleAuth';
 import { useApiClient } from '../../../hooks/useApiClient';
 import { SignSessionKeyResponse } from '@lit-protocol/types';
+import { AppDispatch } from '../../../store';
+import { useDispatch } from 'react-redux';
+import { updateInitialized, updateUsePKP } from '../../../store/app-context';
 
 interface IPKP {
   tokenId: string;
@@ -30,6 +33,7 @@ const CreateNewPKPWalletGoogle = () => {
   const [pkps, setPKPs] = useState<IPKP[]>([]);
   const [currentPKP, setCurrentPKP] = useState<IPKP>();
   const [authSigs, setAuthSigs] = useState<SignSessionKeyResponse>();
+  const dispatch = useDispatch<AppDispatch>();
 
   const litNodeClient = new LitNodeClient({
     litNetwork: 'serrano',
@@ -69,6 +73,8 @@ const CreateNewPKPWalletGoogle = () => {
 
       // Get session sigs for new PKP
       await createSession(newPKP);
+      await dispatch(updateInitialized(true));
+      await dispatch(updateUsePKP(true));
     } catch (err) {
       setError(err);
       setView(Views.ERROR);
@@ -104,6 +110,11 @@ const CreateNewPKPWalletGoogle = () => {
 
       setCurrentPKP(pkp);
       setAuthSigs(signSessionKey);
+      const wallet = await apiClient.callFunc<SignSessionKeyResponse, string>(
+        'wallet.createPKPWallet',
+        signSessionKey
+      );
+      console.log('wallet', wallet);
 
       setView(Views.SESSION_CREATED);
     } catch (err) {

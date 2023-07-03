@@ -9,6 +9,7 @@ export interface AppContextState {
   accountId: string;
   networkId: string;
   biometricDismissed: boolean;
+  usePKP: boolean;
 }
 
 const initialState: AppContextState = {
@@ -18,6 +19,7 @@ const initialState: AppContextState = {
   accountId: '',
   networkId: '',
   biometricDismissed: false,
+  usePKP: false,
 };
 
 // thunks
@@ -30,6 +32,8 @@ export const resetAppContext = createAsyncThunk(
     await thunkApi.dispatch(updateAccountId(''));
     await thunkApi.dispatch(updateWalletId(''));
     await thunkApi.dispatch(updateNetworkId(''));
+    await thunkApi.dispatch(updateBiometricDismissed(false));
+    await thunkApi.dispatch(updateUsePKP(false));
     await storage.clear();
     clearAddressMemoryCache();
   }
@@ -57,6 +61,9 @@ export const appContextSlice = createSlice({
     updateBiometricDismissed(state, action: PayloadAction<boolean>) {
       state.biometricDismissed = action.payload;
     },
+    updateUsePKP(state, action: PayloadAction<boolean>) {
+      state.usePKP = action.payload;
+    },
   },
   extraReducers: (builder) => {
     builder.addCase(resetAppContext.fulfilled, () => {});
@@ -70,6 +77,7 @@ export const {
   updateAccountId,
   updateNetworkId,
   updateBiometricDismissed,
+  updateUsePKP,
 } = appContextSlice.actions;
 
 export default appContextSlice.reducer;

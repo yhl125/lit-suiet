@@ -6,7 +6,7 @@ import { toAccountIdString, toAccountNameString } from '../account';
 import { Buffer } from 'buffer';
 import { whichAvatar } from './utils';
 import { prepareVault } from '../../utils/vault';
-import { AuthSig } from '@lit-protocol/types';
+import { SignSessionKeyResponse } from '@lit-protocol/types';
 import { PKPSuiWallet } from '@yhl125/pkp-sui';
 import { JsonRpcProvider, mainnetConnection } from '@mysten/sui.js';
 
@@ -29,11 +29,6 @@ export type RevealMnemonicParams = {
   token: string;
 };
 export type RevealPrivateKeyParams = RevealMnemonicParams;
-
-export type CreatePKPWalletParams = {
-  pkpPubKey: string;
-  authSig: AuthSig;
-};
 
 export type AccountInWallet = {
   id: string;
@@ -64,7 +59,7 @@ export interface IWalletApi {
   updateWallet: (params: UpdateWalletParams) => Promise<void>;
   deleteWallet: (walletId: string, token: string) => Promise<void>;
 
-  createPKPWallet: (params: CreatePKPWalletParams) => Promise<PKPSuiWallet>;
+  createPKPWallet: (params: SignSessionKeyResponse) => Promise<string>;
 }
 
 export class WalletApi implements IWalletApi {
@@ -230,15 +225,16 @@ export class WalletApi implements IWalletApi {
     return false;
   }
 
-  async createPKPWallet(params: CreatePKPWalletParams): Promise<PKPSuiWallet> {
+  async createPKPWallet(params: SignSessionKeyResponse): Promise<string> {
     const wallet = new PKPSuiWallet(
       {
         controllerAuthSig: params.authSig,
-        pkpPubKey: params.pkpPubKey,
+        pkpPubKey: params.pkpPublicKey,
       },
       new JsonRpcProvider(mainnetConnection)
     );
-    return wallet;
+    await this.storage.addPKPSignSessionKeyResponse(params);
+    return await wallet.getAddress();
   }
 }
 

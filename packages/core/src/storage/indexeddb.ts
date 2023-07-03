@@ -6,8 +6,10 @@ import {
   DB_NAME,
   DB_VERSION,
   GLOBAL_META_ID,
+  GLOBAL_PKP_ID,
   StoreName,
 } from './constants';
+import { SignSessionKeyResponse } from '@lit-protocol/types';
 
 export class IndexedDBStorage implements IStorage {
   private readonly connection: Promise<IDBDatabase>;
@@ -48,6 +50,7 @@ export class IndexedDBStorage implements IStorage {
     db.createObjectStore(StoreName.META, { keyPath: 'id' });
     db.createObjectStore(StoreName.WALLETS, { keyPath: 'id' });
     db.createObjectStore(StoreName.ACCOUNTS, { keyPath: 'id' });
+    db.createObjectStore(StoreName.PKP_WALLET, { keyPath: 'id' });
   }
 
   async addWallet(id: string, wallet: Wallet): Promise<void> {
@@ -384,6 +387,46 @@ export class IndexedDBStorage implements IStorage {
             resolve();
           };
           transaction.onerror = (event) => {
+            reject(event);
+          };
+        })
+    );
+  }
+
+  async addPKPSignSessionKeyResponse(
+    response: SignSessionKeyResponse
+  ): Promise<void> {
+    return await this.connection.then(
+      async (db) =>
+        await new Promise((resolve, reject) => {
+          const request = db
+            .transaction([StoreName.PKP_WALLET], 'readwrite')
+            .objectStore(StoreName.PKP_WALLET)
+            .put({ ...response, id: GLOBAL_PKP_ID });
+
+          request.onsuccess = (event) => {
+            resolve();
+          };
+          request.onerror = (event) => {
+            reject(event);
+          };
+        })
+    );
+  }
+
+  async getPKPSignSessionKeyResponse(): Promise<SignSessionKeyResponse | null> {
+    return await this.connection.then(
+      async (db) =>
+        await new Promise((resolve, reject) => {
+          const request = db
+            .transaction([StoreName.PKP_WALLET])
+            .objectStore(StoreName.PKP_WALLET)
+            .get(GLOBAL_PKP_ID);
+
+          request.onsuccess = (event) => {
+            resolve(request.result);
+          };
+          request.onerror = (event) => {
             reject(event);
           };
         })

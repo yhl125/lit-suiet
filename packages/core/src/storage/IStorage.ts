@@ -1,3 +1,4 @@
+import { SignSessionKeyResponse } from '@lit-protocol/types';
 import { Account, Wallet, GlobalMeta } from './types';
 
 export default interface IStorage {
@@ -27,6 +28,11 @@ export default interface IStorage {
   saveMeta: (meta: GlobalMeta) => Promise<void>;
   clearMeta: () => Promise<void>;
   updateMetaAndWallets: (meta: GlobalMeta, wallets: Wallet[]) => Promise<void>;
+
+  addPKPSignSessionKeyResponse: (
+    response: SignSessionKeyResponse
+  ) => Promise<void>;
+  getPKPSignSessionKeyResponse: () => Promise<SignSessionKeyResponse | null>;
 
   reset: () => Promise<void>;
 }
