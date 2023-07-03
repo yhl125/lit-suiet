@@ -5,8 +5,14 @@ import { useApiClient } from '../../../hooks/useApiClient';
 import { SignSessionKeyResponse } from '@lit-protocol/types';
 import { AppDispatch } from '../../../store';
 import { useDispatch } from 'react-redux';
-import { updateInitialized, updateUsePKP } from '../../../store/app-context';
+import {
+  updateAuthed,
+  updateInitialized,
+  updateNetworkId,
+  updateUsePKP,
+} from '../../../store/app-context';
 import { useNavigate } from 'react-router-dom';
+import { useFeatureFlags } from '../../../hooks/useFeatureFlags';
 
 interface IPKP {
   tokenId: string;
@@ -36,6 +42,7 @@ const CreateNewPKPWalletGoogle = () => {
   const [currentPKP, setCurrentPKP] = useState<IPKP>();
   const [authSigs, setAuthSigs] = useState<SignSessionKeyResponse>();
   const dispatch = useDispatch<AppDispatch>();
+  const featureFlags = useFeatureFlags();
 
   const litNodeClient = new LitNodeClient({
     litNetwork: 'serrano',
@@ -133,7 +140,6 @@ const CreateNewPKPWalletGoogle = () => {
     try {
       // Mint new PKP
       const newPKP = await mintGooglePKP(idToken);
-      console.log('newPKP', newPKP);
 
       // Add new PKP to list of PKPs
       const morePKPs = [...pkps, newPKP];
@@ -146,6 +152,10 @@ const CreateNewPKPWalletGoogle = () => {
       await createSession(newPKP, idToken);
       dispatch(updateInitialized(true));
       dispatch(updateUsePKP(true));
+      dispatch(updateNetworkId(featureFlags?.default_network ?? 'devnet'));
+
+      setView(Views.SESSION_CREATED);
+      navigate('/home');
     } catch (err) {
       setError(err);
       setView(Views.ERROR);
@@ -175,20 +185,13 @@ const CreateNewPKPWalletGoogle = () => {
         expiration: DEFAULT_EXP,
         resources: [],
       });
-      console.log('signSessionKey', signSessionKey);
 
       setCurrentPKP(pkp);
       setAuthSigs(signSessionKey);
-      const wallet = await apiClient
-        .callFunc<SignSessionKeyResponse, string>(
-          'wallet.createPKPWallet',
-          signSessionKey
-        )
-        .then((res) => {
-          setView(Views.SESSION_CREATED);
-          navigate('/home');
-        });
-      console.log('wallet', wallet);
+      const wallet = await apiClient.callFunc<SignSessionKeyResponse, string>(
+        'wallet.createPKPWallet',
+        signSessionKey
+      );
     } catch (err) {
       setError(err);
       setView(Views.ERROR);
