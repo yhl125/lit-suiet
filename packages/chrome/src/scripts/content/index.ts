@@ -1,7 +1,10 @@
 import { PortName, WindowMsg, WindowMsgTarget } from '../shared';
 import { WindowMsgStream } from '../shared/msg-passing/window-msg-stream';
-import { getSiteMetadata, SiteMetadata } from './utils';
-import { validateExternalWindowMsg } from './utils';
+import {
+  getSiteMetadata,
+  SiteMetadata,
+  validateExternalWindowMsg,
+} from './utils';
 
 function injectDappInterface() {
   const script = document.createElement('script');

@@ -61,6 +61,7 @@ export interface IWalletApi {
   deleteWallet: (walletId: string, token: string) => Promise<void>;
 
   createPKPWallet: (params: SignSessionKeyResponse) => Promise<string>;
+  getPKPWallet: () => Promise<PKPWallet>;
 }
 
 export class WalletApi implements IWalletApi {
@@ -239,8 +240,12 @@ export class WalletApi implements IWalletApi {
     return address;
   }
 
-  async getPKPWallet(): Promise<PKPWallet | null> {
-    return await this.storage.getPKPWallet();
+  async getPKPWallet(): Promise<PKPWallet> {
+    const pkpWallet = await this.storage.getPKPWallet();
+    if (!pkpWallet) {
+      throw new Error('PKP wallet not found');
+    }
+    return pkpWallet;
   }
 }
 

@@ -26,10 +26,13 @@ import { useApiClient } from '../../hooks/useApiClient';
 import { OmitToken } from '../../types';
 import useSuiBalance from '../../hooks/coin/useSuiBalance';
 import { getTransactionBlock } from '@suiet/core/src/utils/txb-factory';
-import createTransferCoinTxb from './utils/createTransferCoinTxb';
+import createTransferCoinTxb, {
+  createPKPTransferCoinTxb,
+} from './utils/createTransferCoinTxb';
 import useGasBudgetForTransferCoin from './hooks/useGasBudgetForTranferCoin';
 import useCoinsWithSuiOnTop from './hooks/useCoinsWithSuiOnTop';
 import { useGetAddress } from '../../hooks/usePKPWallet';
+import { pkpSignAndExecuteTransactionBlock } from '../../api/pkp/pkpSigns';
 
 enum Mode {
   symbol,
@@ -70,44 +73,71 @@ const SendPage = () => {
   const submitTransaction = useCallback(async () => {
     if (!sendData.recipientAddress || !sendData.coinType) return;
     if (!network) throw new Error('network is undefined');
-
-    const txEssentials: OmitToken<TxEssentials> = {
-      network,
-      walletId,
-      accountId,
-    };
     const coinAmount = calculateCoinAmount(
       sendData.coinAmountWithDecimals,
       selectedCoin.decimals
     );
-    const serializedTxb = await createTransferCoinTxb({
-      apiClient,
-      context: txEssentials,
-      coinType: sendData.coinType,
-      recipient: sendData.recipientAddress,
-      amount: coinAmount,
-    });
-    const txb = getTransactionBlock(serializedTxb);
-    txb.setGasBudget(gasBudget); // set gas budget which is based on estimated gas fee
-    try {
-      await apiClient.callFunc<
-        SendAndExecuteTxParams<string, OmitToken<TxEssentials>>,
-        void
-      >(
-        'txn.signAndExecuteTransactionBlock',
-        {
-          transactionBlock: txb.serialize(),
-          context: txEssentials,
-        },
-        {
-          withAuth: true,
-        }
-      );
-      message.success('Send transaction succeeded');
-      navigate('/transaction/flow');
-    } catch (e: any) {
-      console.error(e);
-      message.error(`Send transaction failed: ${e?.message}`);
+    if (usePKP === true) {
+      const serializedTxb = await createPKPTransferCoinTxb({
+        apiClient,
+        network,
+        coinType: sendData.coinType,
+        recipient: sendData.recipientAddress,
+        amount: coinAmount,
+      });
+      const txb = getTransactionBlock(serializedTxb);
+      console.log(txb);
+      txb.setGasBudget(gasBudget); // set gas budget which is based on estimated gas fee
+      try {
+        await pkpSignAndExecuteTransactionBlock(
+          {
+            transactionBlock: txb.serialize(),
+            network,
+          },
+          apiClient
+        );
+        message.success('Send transaction succeeded');
+        navigate('/transaction/flow');
+      } catch (e: any) {
+        console.error(e);
+        message.error(`Send transaction failed: ${e?.message}`);
+      }
+    } else {
+      const txEssentials: OmitToken<TxEssentials> = {
+        network,
+        walletId,
+        accountId,
+      };
+
+      const serializedTxb = await createTransferCoinTxb({
+        apiClient,
+        context: txEssentials,
+        coinType: sendData.coinType,
+        recipient: sendData.recipientAddress,
+        amount: coinAmount,
+      });
+      const txb = getTransactionBlock(serializedTxb);
+      txb.setGasBudget(gasBudget); // set gas budget which is based on estimated gas fee
+      try {
+        await apiClient.callFunc<
+          SendAndExecuteTxParams<string, OmitToken<TxEssentials>>,
+          undefined
+        >(
+          'txn.signAndExecuteTransactionBlock',
+          {
+            transactionBlock: txb.serialize(),
+            context: txEssentials,
+          },
+          {
+            withAuth: true,
+          }
+        );
+        message.success('Send transaction succeeded');
+        navigate('/transaction/flow');
+      } catch (e: any) {
+        console.error(e);
+        message.error(`Send transaction failed: ${e?.message}`);
+      }
     }
   }, [gasBudget, sendData, selectedCoin]);
 
