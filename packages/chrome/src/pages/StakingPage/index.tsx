@@ -1,10 +1,7 @@
-import AppLayout from '../../layouts/AppLayout';
 import Button from '../../components/Button';
 import ValidatorSelector from '../../components/ValidatorSelector';
 import { useApiClient } from '../../hooks/useApiClient';
 import {
-  StakeCoinParams,
-  getMintExampleNftTxBlock,
   SendAndExecuteTxParams,
   TxEssentials,
   formatSUI,
@@ -13,7 +10,7 @@ import {
   isCoinAmountValid,
 } from '@suiet/core';
 import { useNetwork } from '../../hooks/useNetwork';
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { RootState } from '../../store';
 import { useSelector } from 'react-redux';
 import { useQuery } from '@apollo/client';
@@ -21,7 +18,6 @@ import { GET_VALIDATORS } from '../../utils/graphql/query';
 import { useNavigate } from 'react-router-dom';
 import Nav from '../../components/Nav';
 import InputAmount from '../../components/InputAmount';
-import { useAccount } from '../../hooks/useAccount';
 import message from '../../components/message';
 import { OmitToken } from '../../types';
 import { useFeatureFlagsWithNetwork } from '../../hooks/useFeatureFlags';
@@ -29,8 +25,7 @@ import Skeleton from 'react-loading-skeleton';
 import { createStakeTransaction } from './utils';
 import useSuiBalance from '../../hooks/coin/useSuiBalance';
 import { SUI_TYPE_ARG } from '@mysten/sui.js';
-import Message from '../../components/message';
-import { compareCoinAmount } from '../../utils/check';
+import { useGetAddress } from '../../hooks/usePKPWallet';
 
 export default function StackingPage() {
   const apiClient = useApiClient();
@@ -70,7 +65,7 @@ export default function StackingPage() {
   //     },
   //   });
 
-  const { address } = useAccount(appContext.accountId);
+  const address = useGetAddress(appContext.usePKP, appContext.accountId);
   const { data: suiBalance, loading: balanceLoading } = useSuiBalance(
     address ?? ''
   );

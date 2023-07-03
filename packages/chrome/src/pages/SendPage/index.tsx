@@ -5,15 +5,18 @@ import Button from '../../components/Button';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
-import { useAccount } from '../../hooks/useAccount';
 import Nav from '../../components/Nav';
 import TokenItem from './TokenItem';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import AddressInputPage from './AddressInput';
 import SendConfirm from './SendConfirm';
 import Skeleton from 'react-loading-skeleton';
 import { CoinDto } from '../../hooks/coin/useCoins';
-import { SendAndExecuteTxParams, TxEssentials } from '@suiet/core';
+import {
+  SendAndExecuteTxParams,
+  TxEssentials,
+  calculateCoinAmount,
+} from '@suiet/core';
 import { DEFAULT_SUI_COIN } from '../../constants/coin';
 import { SendData } from './types';
 import { compareCoinAmount } from '../../utils/check';
@@ -25,8 +28,8 @@ import useSuiBalance from '../../hooks/coin/useSuiBalance';
 import { getTransactionBlock } from '@suiet/core/src/utils/txb-factory';
 import createTransferCoinTxb from './utils/createTransferCoinTxb';
 import useGasBudgetForTransferCoin from './hooks/useGasBudgetForTranferCoin';
-import { calculateCoinAmount } from '@suiet/core';
 import useCoinsWithSuiOnTop from './hooks/useCoinsWithSuiOnTop';
+import { useGetAddress } from '../../hooks/usePKPWallet';
 
 enum Mode {
   symbol,
@@ -35,14 +38,14 @@ enum Mode {
 }
 
 const SendPage = () => {
-  const { accountId, walletId, networkId } = useSelector(
+  const { accountId, walletId, networkId, usePKP } = useSelector(
     (state: RootState) => state.appContext
   );
   const { data: network } = useNetwork(networkId);
 
   const apiClient = useApiClient();
   const navigate = useNavigate();
-  const { address } = useAccount(accountId);
+  const address = useGetAddress(usePKP, accountId);
   const { data: suiBalance } = useSuiBalance(address);
   const { data: coinsWithSuiOnTop, loading: coinsLoading } =
     useCoinsWithSuiOnTop(address);

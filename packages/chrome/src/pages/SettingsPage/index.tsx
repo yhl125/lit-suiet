@@ -2,7 +2,6 @@ import styles from './index.module.scss';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
-import { useAccount } from '../../hooks/useAccount';
 import Address from '../../components/Address';
 import Avatar from '../../components/Avatar';
 import classnames from 'classnames';
@@ -22,6 +21,7 @@ import { ReactComponent as IconNetwork } from '../../assets/icons/net.svg';
 import { ReactComponent as IconLock } from '../../assets/icons/lock.svg';
 import { ReactComponent as IconDiscord } from '../../assets/icons/discord.svg';
 import { ReactComponent as IconTwitter } from '../../assets/icons/twitter.svg';
+import { useGetAddress } from '../../hooks/usePKPWallet';
 type SettingItemProps = Extendable & {
   icon: JSX.Element;
   hideArrow?: boolean;
@@ -64,7 +64,7 @@ const SettingPage = () => {
     context: state.appContext,
   }));
   const { data: wallet } = useWallet(context.walletId);
-  const { address } = useAccount(context.accountId);
+  const address = useGetAddress(context.usePKP, context.accountId);
   const { logout } = useAuth();
 
   return (

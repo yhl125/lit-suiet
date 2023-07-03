@@ -2,7 +2,6 @@ import classnames from 'classnames';
 import type { StyleExtendable } from '../../../types';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../../store';
-import { useAccount } from '../../../hooks/useAccount';
 import { isNonEmptyArray, isSuiToken } from '../../../utils/check';
 import { useMemo } from 'react';
 import { Extendable } from '../../../types';
@@ -22,6 +21,7 @@ import { DEFAULT_SUI_COIN } from '../../../constants/coin';
 import { ReactComponent as VerifiedIcon } from '../../../assets/icons/verified.svg';
 import { ReactComponent as UnverifiedIcon } from '../../../assets/icons/unverified.svg';
 import Tooltip from '../../../components/Tooltip';
+import { useGetAddress } from '../../../hooks/usePKPWallet';
 export type TokenListProps = StyleExtendable;
 
 type TokenItemProps = Extendable & {
@@ -38,7 +38,7 @@ const TokenItem = (props: TokenItemProps) => {
   const appContext = useSelector((state: RootState) => state.appContext);
   const { data: network } = useNetwork(appContext.networkId);
 
-  const { address } = useAccount(appContext.accountId);
+  const address = useGetAddress(appContext.usePKP, appContext.accountId);
   const { data: delegatedStakesResult, loading: stakesLoading } = useQuery(
     GET_DELEGATED_STAKES,
     {
@@ -50,7 +50,7 @@ const TokenItem = (props: TokenItemProps) => {
   );
   const delegatedStakes = delegatedStakesResult?.delegatedStakes;
   const stakedBalance =
-    delegatedStakes?.reduce((accumulator, current) => {
+    delegatedStakes?.reduce((accumulator: any, current: { stakes: any[] }) => {
       const sum = current.stakes.reduce(
         (stakesAccumulator, stake) => stakesAccumulator + stake.principal,
         0
@@ -169,7 +169,7 @@ const TokenItem = (props: TokenItemProps) => {
 
 const TokenList = (props: TokenListProps) => {
   const appContext = useSelector((state: RootState) => state.appContext);
-  const { address } = useAccount(appContext.accountId);
+  const address = useGetAddress(appContext.usePKP, appContext.accountId);
   const {
     data: coins,
     loading: isLoading,

@@ -4,7 +4,6 @@ import styles from './index.module.scss';
 import Button from '../../components/Button';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
-import { useAccount } from '../../hooks/useAccount';
 import { useNftList } from '../../hooks/useNftList';
 import { isNonEmptyArray } from '../../utils/check';
 import Empty from './NftList/Empty';
@@ -23,10 +22,11 @@ import { ReactComponent as GiftIcon } from '../../assets/icons/gift.svg';
 import Message from '../../components/message';
 import { useFeatureFlagsWithNetwork } from '../../hooks/useFeatureFlags';
 import useSuiBalance from '../../hooks/coin/useSuiBalance';
+import { useGetAddress } from '../../hooks/usePKPWallet';
 
 function MainPage() {
   const appContext = useSelector((state: RootState) => state.appContext);
-  const { address } = useAccount(appContext.accountId);
+  const address = useGetAddress(appContext.usePKP, appContext.accountId);
   const {
     data: nftList,
     refetch: refetchNftList,

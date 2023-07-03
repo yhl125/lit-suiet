@@ -19,28 +19,22 @@ import Address from '../../../components/Address';
 import DappPopupLayout from '../../../layouts/DappPopupLayout';
 import { isNonEmptyArray } from '../../../utils/check';
 import {
-  formatCurrency,
   formatGasBudget,
-  formatSUI,
   formatDryRunError,
   AssetChangeFormatter,
 } from '@suiet/core';
 import { isUndefined } from 'lodash-es';
 import { LoadingSpin } from '../../../components/Loading';
 import Message from '../../../components/message';
-import {
-  Coin as CoinAPI,
-  TransactionBlock,
-  TransactionType,
-} from '@mysten/sui.js';
+import { TransactionBlock, TransactionType } from '@mysten/sui.js';
 import isMoveCall from '../utils/isMoveCall';
 import { getGasBudgetFromTxb } from '../../../utils/getters';
 import useMyAssetChangesFromDryRun from './hooks/useMyAssetChangesFromDryRun';
-import { useAccount } from '../../../hooks/useAccount';
 import useSuiBalance from '../../../hooks/coin/useSuiBalance';
 import { ObjectChangeItem } from '../../../components/AssetChange';
 import classNames from 'classnames';
 import './custom.css';
+import { useGetAddress } from '../../../hooks/usePKPWallet';
 enum Mode {
   LOADING,
   INSUFFICIENT_SUI,
@@ -82,7 +76,7 @@ const TxApprovePage = () => {
   const [submitLoading, setSubmitLoading] = useState<boolean>(false);
 
   const appContext = useSelector((state: RootState) => state.appContext);
-  const { data: account } = useAccount(appContext.accountId);
+  const address = useGetAddress(appContext.usePKP, appContext.accountId);
   const { data: wallet } = useWallet(appContext.walletId);
   const search = useLocationSearch();
   const txReqId = search.get('txReqId');
@@ -112,7 +106,7 @@ const TxApprovePage = () => {
     data: { estimatedGasFee, coinChangeList, nftChangeList, objectChangeList },
     error: dryRunError,
     isSuccess: isDryRunSuccess,
-  } = useMyAssetChangesFromDryRun(account?.address, transactionBlock);
+  } = useMyAssetChangesFromDryRun(address, transactionBlock);
 
   const apiClient = useApiClient();
   async function emitApproval(approved: boolean, reason?: TxFailureReason) {
