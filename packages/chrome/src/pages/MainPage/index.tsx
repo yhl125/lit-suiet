@@ -8,12 +8,18 @@ import AppLayout from '../../layouts/AppLayout';
 import { useDappList } from '../../hooks/useDappList';
 import BiometricSetup from '../../components/BiometricSetup';
 import useTransactionListForHistory from '../TransactionFlow/hooks/useTransactionListForHistory';
+import { usePKPWallet } from '../../hooks/usePKPWallet';
 
 function MainPage() {
-  const { accountId, networkId } = useSelector(
+  const { accountId, networkId, usePKP } = useSelector(
     (state: RootState) => state.appContext
   );
-  const { address } = useAccount(accountId);
+  let address: string;
+  if (usePKP) {
+    address = usePKPWallet().address;
+  } else {
+    address = useAccount(accountId).address;
+  }
   // prefetch other tabs' data
   useNftList(address);
   useTransactionListForHistory(address);
