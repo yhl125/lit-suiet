@@ -1,6 +1,7 @@
 import { PKPWallet } from '@suiet/core/src/storage/types';
 import { useApiClient } from './useApiClient';
 import { useEffect, useState } from 'react';
+import { useAccount } from './useAccount';
 
 export function usePKPWallet() {
   const apiClient = useApiClient();
@@ -18,4 +19,12 @@ export function usePKPWallet() {
   return {
     address,
   };
+}
+
+export function useGetAddress(usePKP: boolean, accountId: string) {
+  if (usePKP) {
+    return usePKPWallet().address;
+  } else {
+    return useAccount(accountId).address;
+  }
 }
