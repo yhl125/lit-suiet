@@ -13,6 +13,7 @@ import {
   getLoginUrl,
 } from '../../../utils/googleAuth';
 import { useApiClient } from '../../../hooks/useApiClient';
+import { SignSessionKeyResponse } from '@lit-protocol/types';
 
 interface IPKP {
   tokenId: string;
@@ -31,35 +32,32 @@ const Views = {
   HANDLE_REDIRECT: 'handle-redirect',
 };
 
-const REDIRECT_URI = 'http://localhost:3000';
-
 const CreateNewPKPWalletGoogle = () => {
   const apiClient = useApiClient();
   const navigate = useNavigate();
   const [view, setView] = useState(Views.SIGN_IN);
   const [error, setError] = useState<any>();
 
-  const [litNodeClient, setLitNodeClient] = useState<LitNodeClient>();
-  const [googleIdToken, setGoogleIdToken] = useState<string | null>('');
+  const [googleIdToken, setGoogleIdToken] = useState<string>('');
   const [pkps, setPKPs] = useState<IPKP[]>([]);
   const [currentPKP, setCurrentPKP] = useState<IPKP>();
-  const [sessionSigs, setSessionSigs] = useState();
+  const [authSigs, setAuthSigs] = useState<SignSessionKeyResponse>();
 
   const [message, setMessage] = useState('Free the web!');
   const [signature, setSignature] = useState<string>('');
   const [recoveredAddress, setRecoveredAddress] = useState<string | null>(null);
   const [verified, setVerified] = useState(false);
+  const litNodeClient = new LitNodeClient({
+    litNetwork: 'serrano',
+    debug: false,
+  });
 
-  const handleRedirect = async () => {
+  const handleRedirect = async (id_token: string) => {
     setView(Views.HANDLE_REDIRECT);
     try {
-      // Get Google ID token from redirect callback
-      const googleIdToken = handleSignInRedirect(REDIRECT_URI);
-      setGoogleIdToken(googleIdToken);
-
       // Fetch PKPs associated with Google account
       setView(Views.FETCHING);
-      const pkps = await fetchGooglePKPs(googleIdToken);
+      const pkps = await fetchGooglePKPs(id_token);
       if (pkps.length > 0) {
         setPKPs(pkps);
       }
@@ -76,6 +74,7 @@ const CreateNewPKPWalletGoogle = () => {
     try {
       // Mint new PKP
       const newPKP = await mintGooglePKP(googleIdToken);
+      console.log('newPKP', newPKP);
 
       // Add new PKP to list of PKPs
       const morePKPs = [...pkps, newPKP];
@@ -97,54 +96,30 @@ const CreateNewPKPWalletGoogle = () => {
 
     try {
       // Connect to LitNodeClient if not already connected
-      if (!litNodeClient?.ready && litNodeClient) {
+      if (!litNodeClient.ready) {
         await litNodeClient.connect();
       }
 
-      const authNeededCallback = async (authCallbackParams: {
-        chain: string | number;
-        expiration: any;
-        resources: any;
-      }) => {
-        let chainId = 1;
-        try {
-          const chainInfo = ALL_LIT_CHAINS[authCallbackParams.chain];
-          chainId = chainInfo.chainId;
-        } catch {
-          // Do nothing
-        }
-
-        let response = await litNodeClient?.signSessionKey({
-          authMethods: [
-            {
-              authMethodType: 6,
-              accessToken: googleIdToken,
-            },
-          ],
-          pkpPublicKey: pkp.publicKey,
-          expiration: authCallbackParams.expiration,
-          resources: authCallbackParams.resources,
-          chainId,
-        });
-
-        return response.authSig;
-      };
-      // Create the Lit Resource keyed by `someResource`
-      const litResource = new LitAccessControlConditionResource('*');
       // Generate session sigs with the given session params
-      const sessionSigs = await litNodeClient.getSessionSigs({
-        chain: 'ethereum',
-        resourceAbilityRequests: [
+      const DEFAULT_EXP = new Date(
+        Date.now() + 1000 * 60 * 60 * 24 * 7
+      ).toISOString();
+
+      const signSessionKey = await litNodeClient.signSessionKey({
+        authMethods: [
           {
-            resource: litResource,
-            ability: LitAbility.PKPSigning,
+            authMethodType: 6,
+            accessToken: googleIdToken,
           },
         ],
-        authNeededCallback,
+        pkpPublicKey: pkp.publicKey,
+        expiration: DEFAULT_EXP,
+        resources: [],
       });
+      console.log('signSessionKey', signSessionKey);
 
       setCurrentPKP(pkp);
-      setSessionSigs(sessionSigs);
+      setAuthSigs(signSessionKey);
 
       setView(Views.SESSION_CREATED);
     } catch (err) {
@@ -152,85 +127,6 @@ const CreateNewPKPWalletGoogle = () => {
       setView(Views.ERROR);
     }
   }
-  async function signMessage() {
-    try {
-      const toSign = ethers.getBytes(ethers.hashMessage(message));
-      const litActionCode = `
-        const go = async () => {
-          // this requests a signature share from the Lit Node
-          // the signature share will be automatically returned in the response from the node
-          // and combined into a full signature by the LitJsSdk for you to use on the client
-          // all the params (toSign, publicKey, sigName) are passed in from the LitJsSdk.executeJs() function
-          const sigShare = await LitActions.signEcdsa({ toSign, publicKey, sigName });
-        };
-        go();
-      `;
-      // Sign message
-      const results = await litNodeClient?.executeJs({
-        code: litActionCode,
-        sessionSigs,
-        jsParams: {
-          toSign: toSign,
-          publicKey: currentPKP.publicKey,
-          sigName: 'sig1',
-        },
-      });
-      // Get signature
-      const result = results.signatures['sig1'];
-      const signature = ethers.Signature.from({
-        r: '0x' + result.r,
-        s: '0x' + result.s,
-        v: result.recid,
-      }).serialized;
-      setSignature(signature);
-
-      // Get the address associated with the signature created by signing the message
-      const recoveredAddr = ethers.verifyMessage(message, signature);
-      setRecoveredAddress(recoveredAddr);
-      // Check if the address associated with the signature is the same as the current PKP
-      const verified =
-        currentPKP!.ethAddress.toLowerCase() === recoveredAddr.toLowerCase();
-      setVerified(verified);
-    } catch (err) {
-      setError(err);
-      setView(Views.ERROR);
-    }
-  }
-
-  useEffect(() => {
-    /**
-     * Initialize LitNodeClient
-     */
-    async function initLitNodeClient() {
-      try {
-        // Set up LitNodeClient
-        const litNodeClient = new LitNodeClient({
-          litNetwork: 'serrano',
-          debug: false,
-        });
-
-        // Connect to Lit nodes
-        await litNodeClient.connect();
-
-        // Set LitNodeClient
-        setLitNodeClient(litNodeClient);
-      } catch (err) {
-        setError(err);
-        setView(Views.ERROR);
-      }
-    }
-
-    if (!litNodeClient) {
-      initLitNodeClient();
-    }
-  }, [litNodeClient]);
-
-  useEffect(() => {
-    // Check if app has been redirected from Lit login server
-    if (isSignInRedirect(REDIRECT_URI)) {
-      handleRedirect();
-    }
-  }, [handleRedirect]);
 
   function signInWithGoogle() {
     // Get login url
@@ -240,14 +136,16 @@ const CreateNewPKPWalletGoogle = () => {
     chrome.identity
       .launchWebAuthFlow({ interactive: true, url: loginUrl })
       .then(async (res) => {
-        const id_token = extractAccessToken(res!);
-        setGoogleIdToken(id_token);
-        const pkps = await fetchGooglePKPs(id_token);
+        try {
+          const id_token = extractAccessToken(res!);
+          setGoogleIdToken(id_token!);
+          handleRedirect(id_token!);
+        } catch {
+          throw Error(`id_token doesn't exist`);
+        }
+
         console.log(pkps);
       });
-
-    // chrome.windows.create({ url: loginUrl, focused: true });
-    // window.location.assign(loginUrl);
   }
   function extractAccessToken(url: string): string | null {
     let m = url.match(/[#?](.*)/);
@@ -287,7 +185,7 @@ const CreateNewPKPWalletGoogle = () => {
    *
    * @returns newly minted PKP
    */
-  async function mintGooglePKP(idToken: string | null) {
+  async function mintGooglePKP(idToken: string) {
     // Mint a new PKP via relay server
     const body = JSON.stringify({
       idToken: idToken,
@@ -333,7 +231,7 @@ const CreateNewPKPWalletGoogle = () => {
             <p>{error.message}</p>
             <button
               onClick={() => {
-                if (sessionSigs) {
+                if (authSigs) {
                   setView(Views.SESSION_CREATED);
                 } else {
                   if (googleIdToken) {
@@ -409,7 +307,7 @@ const CreateNewPKPWalletGoogle = () => {
             <h1>Saving your session...</h1>
           </>
         )}
-        {view === Views.SESSION_CREATED && (
+        {/* {view === Views.SESSION_CREATED && (
           <>
             <h1>Ready for the open web</h1>
             <div>
@@ -434,7 +332,7 @@ const CreateNewPKPWalletGoogle = () => {
               )}
             </div>
           </>
-        )}
+        )} */}
       </main>
     </>
   );
