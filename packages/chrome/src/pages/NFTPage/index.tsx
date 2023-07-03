@@ -23,6 +23,7 @@ import Message from '../../components/message';
 import { useFeatureFlagsWithNetwork } from '../../hooks/useFeatureFlags';
 import useSuiBalance from '../../hooks/coin/useSuiBalance';
 import { useGetAddress } from '../../hooks/usePKPWallet';
+import { pkpSignAndExecuteTransactionBlock } from '../../api/pkp/pkpSigns';
 
 function MainPage() {
   const appContext = useSelector((state: RootState) => state.appContext);
@@ -53,21 +54,31 @@ function MainPage() {
       return;
     }
     const tx = getMintExampleNftTxBlock(featureFlags.sample_nft_object_id);
-    await apiClient.callFunc<
-      SendAndExecuteTxParams<string, OmitToken<TxEssentials>>,
-      undefined
-    >(
-      'txn.signAndExecuteTransactionBlock',
-      {
-        transactionBlock: tx.serialize(),
-        context: {
+    if (appContext.usePKP) {
+      await pkpSignAndExecuteTransactionBlock(
+        {
+          transactionBlock: tx.serialize(),
           network,
-          walletId: appContext.walletId,
-          accountId: appContext.accountId,
         },
-      },
-      { withAuth: true }
-    );
+        apiClient
+      );
+    } else {
+      await apiClient.callFunc<
+        SendAndExecuteTxParams<string, OmitToken<TxEssentials>>,
+        undefined
+      >(
+        'txn.signAndExecuteTransactionBlock',
+        {
+          transactionBlock: tx.serialize(),
+          context: {
+            network,
+            walletId: appContext.walletId,
+            accountId: appContext.accountId,
+          },
+        },
+        { withAuth: true }
+      );
+    }
     Message.success('Mint succeeded');
   }, [
     featureFlags?.sample_nft_object_id,
