@@ -9,6 +9,7 @@ import { prepareVault } from '../../utils/vault';
 import { SignSessionKeyResponse } from '@lit-protocol/types';
 import { PKPSuiWallet } from '@yhl125/pkp-sui';
 import { JsonRpcProvider, mainnetConnection } from '@mysten/sui.js';
+import { PKPWallet } from '../../storage/types';
 
 export type CreateWalletParams = {
   token: string;
@@ -233,8 +234,13 @@ export class WalletApi implements IWalletApi {
       },
       new JsonRpcProvider(mainnetConnection)
     );
-    await this.storage.addPKPSignSessionKeyResponse(params);
-    return await wallet.getAddress();
+    const address = await wallet.getAddress();
+    await this.storage.addPKPWallet({ ...params, address });
+    return address;
+  }
+
+  async getPKPWallet(): Promise<PKPWallet | null> {
+    return await this.storage.getPKPWallet();
   }
 }
 
