@@ -17,7 +17,12 @@ const Welcome = () => {
   }
 
   function handleCreatePKP() {
-    navigate('/onboard/create-new-pkp-wallet-google');
+    // navigate('/onboard/create-new-pkp-wallet-google');
+    chrome.tabs.create({
+      url: chrome.runtime.getURL(
+        'index.html#/onboard/create-new-pkp-wallet-google'
+      ),
+    });
   }
 
   useEffectAdjustInitializedStatus(appContext);
@@ -41,12 +46,10 @@ const Welcome = () => {
         <RectButton onClick={handleImportWallet}>Import Wallet</RectButton>
       </section>
       <section className={'mt-[7px] w-full flex justify-between'}>
-        <RectButton theme={'biometric'} onClick={handleCreatePKP}>
+        <RectButton theme={'primary'} onClick={handleCreatePKP}>
           Create with Google
         </RectButton>
-        <RectButton theme={'biometric-secondary'}>
-          Sign in with Google
-        </RectButton>
+        <RectButton>Sign in with Google</RectButton>
       </section>
     </BrandLayout>
   );
