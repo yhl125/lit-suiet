@@ -2,12 +2,13 @@
 <img width="480" src="./assets/LogoWithSlogen.png?raw=trueg"/>
 </a>
 
-# Suiet, the wallet designed for everyone
+# Lit-Suiet, the seedless sui wallet
 
 > If you want to know how to **install/use** suiet, please visit our offical website [suiet.app](https://suiet.app) or [docs](https://suiet.app/docs)
 
 > **Warning**
-> Suiet is current on devnet, we may make break changes before the mainnet of [Sui](sui.io) goes online.
+> Lit protocol is in a developer preview state. The data on the Serrano Testnet is not persistent and may be erased at any time.
+> Do not store store anything of value in this
 
 ## 🚀 Getting Started
 
