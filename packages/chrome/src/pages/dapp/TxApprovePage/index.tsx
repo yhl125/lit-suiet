@@ -113,19 +113,29 @@ const TxApprovePage = () => {
     if (!txReqData) return;
     try {
       setSubmitLoading(true);
-      await apiClient.callFunc(
-        'dapp.callbackApproval',
-        {
+      if (appContext.usePKP === true) {
+        await apiClient.callFunc('dapp.callbackPKPApproval', {
           approved,
           reason: reason ?? null,
           id: txReqData.id,
           type: ApprovalType.TRANSACTION,
           updatedAt: new Date().toISOString(),
-        },
-        {
-          withAuth: true,
-        }
-      );
+        });
+      } else {
+        await apiClient.callFunc(
+          'dapp.callbackApproval',
+          {
+            approved,
+            reason: reason ?? null,
+            id: txReqData.id,
+            type: ApprovalType.TRANSACTION,
+            updatedAt: new Date().toISOString(),
+          },
+          {
+            withAuth: true,
+          }
+        );
+      }
     } finally {
       setSubmitLoading(false);
     }

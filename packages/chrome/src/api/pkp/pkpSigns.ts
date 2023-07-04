@@ -69,6 +69,10 @@ async function getPKPWallet(network: Network, apiClient: BackgroundApiClient) {
   if (!pkpWallet) {
     throw new Error('PKP wallet not found');
   }
+  return getPKPSuiWallet(network, pkpWallet);
+}
+
+function getPKPSuiWallet(network: Network, pkpWallet: PKPWallet) {
   return new PKPSuiWallet(
     {
       controllerAuthSig: pkpWallet.authSig,
@@ -134,6 +138,14 @@ export async function pkpSignMessage(
   return await pkpWallet.signMessage({ message: params.message });
 }
 
+export async function pkpSignMessageDapp(
+  params: PKPSignMessageParams,
+  pkpWallet: PKPWallet
+) {
+  const wallet = getPKPSuiWallet(params.network, pkpWallet);
+  return await wallet.signMessage({ message: params.message });
+}
+
 export async function pkpSignAndExecuteTransactionBlock(
   params: PKPSendAndExecuteTxParams<string | TransactionBlock>,
   apiClient: BackgroundApiClient
@@ -151,12 +163,39 @@ export async function pkpSignAndExecuteTransactionBlock(
   }
 }
 
+export async function pkpSignAndExecuteTransactionBlockDapp(
+  params: PKPSendAndExecuteTxParams<string | TransactionBlock>,
+  pkpWallet: PKPWallet
+) {
+  const wallet = getPKPSuiWallet(params.network, pkpWallet);
+  const txb = getTransactionBlock(params.transactionBlock);
+  try {
+    return await wallet.signAndExecuteTransactionBlock({
+      transactionBlock: txb,
+      requestType: params.requestType,
+      options: params.options,
+    });
+  } catch (e) {
+    handleSuiRpcError(e);
+  }
+}
+
 export async function pkpSignTransactionBlock(
   params: PKPSendTxParams<string | TransactionBlock>,
   apiClient: BackgroundApiClient
 ) {
   const pkpWallet = await getPKPWallet(params.network, apiClient);
   return await pkpWallet.signTransactionBlock({
+    transactionBlock: getTransactionBlock(params.transactionBlock),
+  });
+}
+
+export async function pkpSignTransactionBlockDapp(
+  params: PKPSendTxParams<string | TransactionBlock>,
+  pkpWallet: PKPWallet
+) {
+  const wallet = getPKPSuiWallet(params.network, pkpWallet);
+  return await wallet.signTransactionBlock({
     transactionBlock: getTransactionBlock(params.transactionBlock),
   });
 }

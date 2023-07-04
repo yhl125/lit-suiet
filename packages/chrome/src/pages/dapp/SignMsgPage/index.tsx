@@ -28,19 +28,27 @@ const SignMsgPage = () => {
 
   async function emitApproval(approved: boolean) {
     if (!reqData) return;
-
-    await apiClient.callFunc(
-      'dapp.callbackApproval',
-      {
+    if (appContext.usePKP === true) {
+      await apiClient.callFunc('dapp.callbackPKPApproval', {
         approved,
         id: reqData.id,
         type: ApprovalType.SIGN_MSG,
         updatedAt: new Date().toISOString(),
-      },
-      {
-        withAuth: true,
-      }
-    );
+      });
+    } else {
+      await apiClient.callFunc(
+        'dapp.callbackApproval',
+        {
+          approved,
+          id: reqData.id,
+          type: ApprovalType.SIGN_MSG,
+          updatedAt: new Date().toISOString(),
+        },
+        {
+          withAuth: true,
+        }
+      );
+    }
   }
 
   useEffect(() => {
