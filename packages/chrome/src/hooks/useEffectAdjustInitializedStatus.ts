@@ -24,6 +24,9 @@ export function useEffectAdjustInitializedStatus(appContext: AppContextState) {
   const featureFlags = useFeatureFlags();
 
   async function adjustInitializedStatus() {
+    if (appContext.usePKP) {
+      return;
+    }
     const wallets = await apiClient.callFunc<null, Wallet[]>(
       'wallet.getWallets',
       null

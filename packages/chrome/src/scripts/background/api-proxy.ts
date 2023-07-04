@@ -6,6 +6,7 @@ import {
   NetworkApi,
   TransactionApi,
   WalletApi,
+  PKPGoogleApi,
 } from '@suiet/core';
 import { fromEventPattern } from 'rxjs';
 import { CallFuncOption, PortName, resData } from '../shared';
@@ -40,6 +41,7 @@ export class BackgroundApiProxy {
   #txn: TransactionApi;
   #network: NetworkApi;
   #dapp: DappBgApi;
+  #pkpGoogle: PKPGoogleApi;
 
   constructor() {
     this.#registerServices();
@@ -114,6 +116,10 @@ export class BackgroundApiProxy {
         this.#account
       ),
       'dapp'
+    );
+    this.#pkpGoogle = this.#registerProxyService<PKPGoogleApi>(
+      new PKPGoogleApi(),
+      'pkpGoogle'
     );
     this.#root = this.#registerProxyService<RootApi>(
       ((ctx: any) => ({

@@ -1,5 +1,6 @@
 import { ExecutionStatusType } from '@mysten/sui.js';
 import { AccountInWallet } from '../api/wallet';
+import { AuthSig } from '@lit-protocol/types';
 
 export const WALLET_PREFIX = 'wallet-';
 
@@ -78,4 +79,10 @@ export type MoveCallInfo<T = TxObject> = {
 export type ObjectId = {
   type: 'object_id';
   id: string;
+};
+
+export type PKPWallet = {
+  address: string;
+  pkpPublicKey: string;
+  authSig: AuthSig;
 };

@@ -3,7 +3,7 @@ import IconArrowRight from '../../../assets/icons/arrow-right.svg';
 import classnames from 'classnames';
 import { useDispatch, useSelector } from 'react-redux';
 import { AppDispatch, RootState } from '../../../store';
-import { getAddress, useAccount } from '../../../hooks/useAccount';
+import { getAddress } from '../../../hooks/useAccount';
 import { useEffect, useMemo, useState } from 'react';
 import WalletSwitcher, { WalletData } from '../../../components/WalletSwitcher';
 import { useWallets } from '../../../hooks/useWallets';
@@ -17,6 +17,7 @@ import Avatar from '../../../components/Avatar';
 import { useWallet } from '../../../hooks/useWallet';
 import { AccountInWallet, Wallet } from '@suiet/core';
 import { useApiClient } from '../../../hooks/useApiClient';
+import { useGetAddress } from '../../../hooks/usePKPWallet';
 
 function useWalletAccountMap(wallets: Wallet[]) {
   const apiClient = useApiClient();
@@ -102,7 +103,8 @@ function Header(props: HeaderProps) {
   }));
   const [doSwitch, setDoSwitch] = useState<boolean>(openSwitcher);
   const navigate = useNavigate();
-  const { address } = useAccount(context.accountId);
+  const address = useGetAddress(context.usePKP, context.accountId);
+
   const dispatch = useDispatch<AppDispatch>();
   const { data: wallet } = useWallet(context.walletId);
 

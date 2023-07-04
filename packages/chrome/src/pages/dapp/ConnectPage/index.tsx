@@ -38,18 +38,27 @@ const ConnectPage = () => {
   async function emitApproval(approved: boolean) {
     if (!permReqData) return;
 
-    await apiClient.callFunc(
-      'dapp.callbackApproval',
-      {
+    if (appContext.usePKP === true) {
+      await apiClient.callFunc('dapp.callbackPKPApproval', {
         approved,
         id: permReqData.id,
         type: ApprovalType.PERMISSION,
         updatedAt: new Date().toISOString(),
-      },
-      {
-        withAuth: true,
-      }
-    );
+      });
+    } else {
+      await apiClient.callFunc(
+        'dapp.callbackApproval',
+        {
+          approved,
+          id: permReqData.id,
+          type: ApprovalType.PERMISSION,
+          updatedAt: new Date().toISOString(),
+        },
+        {
+          withAuth: true,
+        }
+      );
+    }
   }
 
   useEffect(() => {

@@ -18,6 +18,7 @@ import styles from './index.module.scss';
 import useEstimatedGasFee from '../../../hooks/transaction/useEstimatedGasFee';
 import { useForm } from 'react-hook-form';
 import { useFeatureFlagsWithNetwork } from '../../../hooks/useFeatureFlags';
+import { pkpTransferObject } from '../../../api/pkp/pkpSigns';
 
 interface SendFormValues {
   address: string;
@@ -60,17 +61,28 @@ export default function SendNft() {
 
     setSendLoading(true);
     try {
-      await apiClient.callFunc<OmitToken<TransferObjectParams>, undefined>(
-        'txn.transferObject',
-        {
-          network,
-          recipient: data.address,
-          walletId: appContext.walletId,
-          accountId: appContext.accountId,
-          objectId: id,
-        },
-        { withAuth: true }
-      );
+      if (appContext.usePKP === true) {
+        await pkpTransferObject(
+          {
+            network,
+            recipient: data.address,
+            objectId: id,
+          },
+          apiClient
+        );
+      } else {
+        await apiClient.callFunc<OmitToken<TransferObjectParams>, undefined>(
+          'txn.transferObject',
+          {
+            network,
+            recipient: data.address,
+            walletId: appContext.walletId,
+            accountId: appContext.accountId,
+            objectId: id,
+          },
+          { withAuth: true }
+        );
+      }
       message.success('Send succeeded');
       navigate('/transaction/flow');
     } catch (e: any) {

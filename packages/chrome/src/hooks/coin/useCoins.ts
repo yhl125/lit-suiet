@@ -9,6 +9,19 @@ export interface CoinDto {
   decimals: number;
   isVerified: boolean;
 }
+
+export interface GQLCoinDto {
+  type: string;
+  symbol: string;
+  balance: string;
+  metadata: Metadata;
+  isVerified: boolean;
+}
+
+interface Metadata {
+  decimals: number;
+}
+
 export type CoinBalance = {
   balance: string;
   decimals: number;
@@ -28,13 +41,13 @@ const GET_COINS_GQL = gql`
   }
 `;
 
-function formatCoinFromGql(coin: any): CoinDto {
+function formatCoinFromGql(coin: GQLCoinDto): CoinDto {
   return {
     type: coin.type,
     symbol: coin.symbol,
     balance: coin.balance,
     isVerified: coin.isVerified,
-    decimals: coin.metadata?.decimals ?? 0,
+    decimals: coin.metadata.decimals ?? 0,
   };
 }
 /**
@@ -43,8 +56,8 @@ function formatCoinFromGql(coin: any): CoinDto {
  * @param options
  */
 export default function useCoins(address: string, options?: QueryHookOptions) {
-  const { pollInterval = 5 * 1000, ...restOptions } = options || {};
-  const { data, ...rest } = useQuery<{ coins: CoinDto[] }>(GET_COINS_GQL, {
+  const { pollInterval = 5 * 1000, ...restOptions } = options ?? {};
+  const { data, ...rest } = useQuery<{ coins: GQLCoinDto[] }>(GET_COINS_GQL, {
     variables: {
       address,
     },
@@ -88,7 +101,7 @@ export default function useCoins(address: string, options?: QueryHookOptions) {
 }
 
 export function useCoinsLazyQuery(options?: LazyQueryHookOptions) {
-  const [getCoins, { data, ...rest }] = useLazyQuery<{ coins: CoinDto[] }>(
+  const [getCoins, { data, ...rest }] = useLazyQuery<{ coins: GQLCoinDto[] }>(
     GET_COINS_GQL,
     options
   );

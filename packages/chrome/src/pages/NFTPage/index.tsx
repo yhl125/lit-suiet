@@ -4,7 +4,6 @@ import styles from './index.module.scss';
 import Button from '../../components/Button';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
-import { useAccount } from '../../hooks/useAccount';
 import { useNftList } from '../../hooks/useNftList';
 import { isNonEmptyArray } from '../../utils/check';
 import Empty from './NftList/Empty';
@@ -23,10 +22,12 @@ import { ReactComponent as GiftIcon } from '../../assets/icons/gift.svg';
 import Message from '../../components/message';
 import { useFeatureFlagsWithNetwork } from '../../hooks/useFeatureFlags';
 import useSuiBalance from '../../hooks/coin/useSuiBalance';
+import { useGetAddress } from '../../hooks/usePKPWallet';
+import { pkpSignAndExecuteTransactionBlock } from '../../api/pkp/pkpSigns';
 
 function MainPage() {
   const appContext = useSelector((state: RootState) => state.appContext);
-  const { address } = useAccount(appContext.accountId);
+  const address = useGetAddress(appContext.usePKP, appContext.accountId);
   const {
     data: nftList,
     refetch: refetchNftList,
@@ -53,21 +54,31 @@ function MainPage() {
       return;
     }
     const tx = getMintExampleNftTxBlock(featureFlags.sample_nft_object_id);
-    await apiClient.callFunc<
-      SendAndExecuteTxParams<string, OmitToken<TxEssentials>>,
-      undefined
-    >(
-      'txn.signAndExecuteTransactionBlock',
-      {
-        transactionBlock: tx.serialize(),
-        context: {
+    if (appContext.usePKP === true) {
+      await pkpSignAndExecuteTransactionBlock(
+        {
+          transactionBlock: tx,
           network,
-          walletId: appContext.walletId,
-          accountId: appContext.accountId,
         },
-      },
-      { withAuth: true }
-    );
+        apiClient
+      );
+    } else {
+      await apiClient.callFunc<
+        SendAndExecuteTxParams<string, OmitToken<TxEssentials>>,
+        undefined
+      >(
+        'txn.signAndExecuteTransactionBlock',
+        {
+          transactionBlock: tx.serialize(),
+          context: {
+            network,
+            walletId: appContext.walletId,
+            accountId: appContext.accountId,
+          },
+        },
+        { withAuth: true }
+      );
+    }
     Message.success('Mint succeeded');
   }, [
     featureFlags?.sample_nft_object_id,

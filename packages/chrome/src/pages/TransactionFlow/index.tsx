@@ -3,7 +3,6 @@ import './index.scss';
 import { useNavigate } from 'react-router-dom';
 import classnames from 'classnames';
 import Empty from './Empty';
-import { useAccount } from '../../hooks/useAccount';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
 import dayjs from 'dayjs';
@@ -21,6 +20,7 @@ import InfiniteScroll from 'react-infinite-scroll-component';
 import Typo from '../../components/Typo';
 import orderTimeList from './utils/orderTimeList';
 import message from '../../components/message';
+import { useGetAddress } from '../../hooks/usePKPWallet';
 
 function TransactionFlow({
   txHistoryList,
@@ -126,7 +126,7 @@ function TransactionFlow({
 
 function TransactionPage() {
   const context = useSelector((state: RootState) => state.appContext);
-  const { address } = useAccount(context.accountId);
+  const address = useGetAddress(context.usePKP, context.accountId);
   const {
     data: transactions,
     loading,

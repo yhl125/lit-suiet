@@ -6,8 +6,10 @@ import { Vault } from '../vault/Vault';
 import { Buffer } from 'buffer';
 import {
   CoinMetadata,
+  Connection,
   DryRunTransactionBlockResponse,
   ExecuteTransactionRequestType,
+  JsonRpcProvider,
   SignedMessage,
   SignedTransaction,
   SUI_SYSTEM_STATE_OBJECT_ID,
@@ -20,6 +22,7 @@ import {
 import { RpcError } from '../errors';
 import { SuiTransactionBlockResponseOptions } from '@mysten/sui.js/src/types';
 import { getTransactionBlock } from '../utils/txb-factory';
+import { PKPSuiWallet } from '@yhl125/pkp-sui';
 
 export const DEFAULT_SUPPORTED_COINS = new Map<string, CoinPackageIdPair>([
   [
@@ -162,6 +165,13 @@ export type GetReferencePriceParams = {
   network: Network;
 };
 
+export type PKPTransferCoinParams = {
+  network: Network;
+  coinType: string;
+  amount: string;
+  recipient: string;
+};
+
 export interface ITransactionApi {
   supportedCoins: () => Promise<CoinPackageIdPair[]>;
   transferCoin: (
@@ -209,6 +219,9 @@ export interface ITransactionApi {
   // unStakeCoin: (
   //   params: UnStakeCoinParams
   // ) => Promise<SuiExecuteTransactionResponse>;
+  pkpGetSerializedTransferCoinTxb: (
+    params: PKPTransferCoinParams
+  ) => Promise<string>;
 }
 
 export class TransactionApi implements ITransactionApi {
@@ -576,4 +589,38 @@ export class TransactionApi implements ITransactionApi {
   //     gasBudgetForStake
   //   );
   // }
+
+  async PKPWallet(network: Network) {
+    const pkpWallet = await this.storage.getPKPWallet();
+    if (!pkpWallet) {
+      throw new Error('PKP wallet not found');
+    }
+    return new PKPSuiWallet(
+      {
+        controllerAuthSig: pkpWallet.authSig,
+        pkpPubKey: pkpWallet.pkpPublicKey,
+      },
+      new JsonRpcProvider(new Connection({ fullnode: network.txRpcUrl }))
+    );
+  }
+
+  async pkpGetSerializedTransferCoinTxb(
+    params: PKPTransferCoinParams
+  ): Promise<string> {
+    const provider = new Provider(
+      params.network.queryRpcUrl,
+      params.network.txRpcUrl,
+      params.network.versionCacheTimoutInSeconds
+    );
+    const pkpWallet = await this.PKPWallet(params.network);
+
+    const txb = await provider.getTransferCoinTxb(
+      params.coinType,
+      BigInt(params.amount),
+      params.recipient,
+      await pkpWallet.getAddress()
+    );
+    // for bypassing the chrome messaging
+    return txb.serialize();
+  }
 }

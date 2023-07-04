@@ -15,9 +15,6 @@ import {
   PaginatedCoins,
   DryRunTransactionBlockResponse,
   SuiTransactionBlockResponse,
-  getTotalGasUsed,
-  is,
-  RPCError as SuiRpcError,
   RPCValidationError as SuiRpcValidationError,
   SuiObjectDataOptions,
   CoinMetadata,
@@ -308,13 +305,13 @@ export class QueryProvider {
   }
 
   public async getCoinMetadata(coinTypes: string[]): Promise<
-    {
+    Array<{
       data: CoinMetadata | null;
       error: string | null;
-    }[]
+    }>
   > {
-    const requests = coinTypes.map((coinType) => {
-      return this.provider.getCoinMetadata({
+    const requests = coinTypes.map(async (coinType) => {
+      return await this.provider.getCoinMetadata({
         coinType,
       });
     });
@@ -339,14 +336,7 @@ export class QueryProvider {
   }
 }
 
-function handleSuiRpcError(e: unknown): never {
-  if (e instanceof SuiRpcError) {
-    throw new RpcError((e?.cause as any)?.message ?? e.message, {
-      code: e.code,
-      data: e.data,
-      cause: e.cause,
-    });
-  }
+export function handleSuiRpcError(e: unknown): never {
   if (e instanceof SuiRpcValidationError) {
     throw new RpcError(e.message, {
       result: e.result,

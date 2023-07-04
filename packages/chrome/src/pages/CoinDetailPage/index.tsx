@@ -1,19 +1,22 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
-import { useAccount } from '../../hooks/useAccount';
 import { useWallet } from '../../hooks/useWallet';
 import Avatar from '../../components/Avatar';
 import IconWaterDrop from '../../assets/icons/waterdrop.svg';
 import IconToken from '../../assets/icons/token.svg';
 import styles from './index.module.scss';
 import TokenIcon from '../../components/TokenIcon';
-import { SendAndExecuteTxParams, TxEssentials } from '@suiet/core';
+import {
+  SendAndExecuteTxParams,
+  TxEssentials,
+  formatSUI,
+  formatCurrency,
+} from '@suiet/core';
 import classNames from 'classnames';
 import message from '../../components/message';
 import { OmitToken } from '../../types';
 import { useNetwork } from '../../hooks/useNetwork';
-import { formatSUI, formatCurrency } from '@suiet/core';
 import { ReactComponent as IconStakeFilled } from '../../assets/icons/stake-filled.svg';
 import { useQuery } from '@apollo/client';
 import { GET_DELEGATED_STAKES } from '../../utils/graphql/query';
@@ -26,6 +29,8 @@ import { useState } from 'react';
 import { createUnstakeTransaction } from '../StakingPage/utils';
 import useCoins from '../../hooks/coin/useCoins';
 import { isSuiToken } from '../../utils/check';
+import { useGetAddress } from '../../hooks/usePKPWallet';
+import { pkpSignAndExecuteTransactionBlock } from '../../api/pkp/pkpSigns';
 
 export default function CoinDetailPage() {
   const appContext = useSelector((state: RootState) => state.appContext);
@@ -34,7 +39,7 @@ export default function CoinDetailPage() {
   const routeParams = useParams();
   const coinType = routeParams['coinType'];
   const navigate = useNavigate();
-  const { address } = useAccount(appContext.accountId);
+  const address = useGetAddress(appContext.usePKP, appContext.accountId);
   const { data: wallet } = useWallet(appContext.walletId);
   const [buttonLoading, setButtonLoading] = useState<KeyValueObject>({});
   const { data: delegatedStakesResult, loading: stakesLoading } = useQuery(
@@ -87,21 +92,31 @@ export default function CoinDetailPage() {
 
       const tx = createUnstakeTransaction(stakeObjectID);
       // tx.setGasBudget(700_000_000);
-      await apiClient.callFunc<
-        SendAndExecuteTxParams<string, OmitToken<TxEssentials>>,
-        undefined
-      >(
-        'txn.signAndExecuteTransactionBlock',
-        {
-          transactionBlock: tx.serialize(),
-          context: {
+      if (appContext.usePKP === true) {
+        await pkpSignAndExecuteTransactionBlock(
+          {
+            transactionBlock: tx,
             network,
-            walletId: appContext.walletId,
-            accountId: appContext.accountId,
           },
-        },
-        { withAuth: true }
-      );
+          apiClient
+        );
+      } else {
+        await apiClient.callFunc<
+          SendAndExecuteTxParams<string, OmitToken<TxEssentials>>,
+          undefined
+        >(
+          'txn.signAndExecuteTransactionBlock',
+          {
+            transactionBlock: tx.serialize(),
+            context: {
+              network,
+              walletId: appContext.walletId,
+              accountId: appContext.accountId,
+            },
+          },
+          { withAuth: true }
+        );
+      }
       message.success('Unstake SUI succeeded');
       navigate('/transaction/flow');
     } catch (e: any) {

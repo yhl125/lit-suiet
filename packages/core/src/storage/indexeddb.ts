@@ -1,4 +1,4 @@
-import { Account, GlobalMeta, Wallet } from './types';
+import { Account, GlobalMeta, PKPWallet, Wallet } from './types';
 import IStorage from './IStorage';
 import indexeddbMigrations, { MigrationMethod } from './migrations/indexeddb';
 import {
@@ -6,6 +6,7 @@ import {
   DB_NAME,
   DB_VERSION,
   GLOBAL_META_ID,
+  GLOBAL_PKP_ID,
   StoreName,
 } from './constants';
 
@@ -48,6 +49,7 @@ export class IndexedDBStorage implements IStorage {
     db.createObjectStore(StoreName.META, { keyPath: 'id' });
     db.createObjectStore(StoreName.WALLETS, { keyPath: 'id' });
     db.createObjectStore(StoreName.ACCOUNTS, { keyPath: 'id' });
+    db.createObjectStore(StoreName.PKP_WALLET, { keyPath: 'id' });
   }
 
   async addWallet(id: string, wallet: Wallet): Promise<void> {
@@ -384,6 +386,44 @@ export class IndexedDBStorage implements IStorage {
             resolve();
           };
           transaction.onerror = (event) => {
+            reject(event);
+          };
+        })
+    );
+  }
+
+  async addPKPWallet(wallet: PKPWallet): Promise<void> {
+    return await this.connection.then(
+      async (db) =>
+        await new Promise((resolve, reject) => {
+          const request = db
+            .transaction([StoreName.PKP_WALLET], 'readwrite')
+            .objectStore(StoreName.PKP_WALLET)
+            .put({ ...wallet, id: GLOBAL_PKP_ID });
+
+          request.onsuccess = (event) => {
+            resolve();
+          };
+          request.onerror = (event) => {
+            reject(event);
+          };
+        })
+    );
+  }
+
+  async getPKPWallet(): Promise<PKPWallet | null> {
+    return await this.connection.then(
+      async (db) =>
+        await new Promise((resolve, reject) => {
+          const request = db
+            .transaction([StoreName.PKP_WALLET])
+            .objectStore(StoreName.PKP_WALLET)
+            .get(GLOBAL_PKP_ID);
+
+          request.onsuccess = (event) => {
+            resolve(request.result);
+          };
+          request.onerror = (event) => {
             reject(event);
           };
         })

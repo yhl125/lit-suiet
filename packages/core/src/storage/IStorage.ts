@@ -1,4 +1,4 @@
-import { Account, Wallet, GlobalMeta } from './types';
+import { Account, Wallet, GlobalMeta, PKPWallet } from './types';
 
 export default interface IStorage {
   getWallets: () => Promise<Wallet[]>;
@@ -27,6 +27,9 @@ export default interface IStorage {
   saveMeta: (meta: GlobalMeta) => Promise<void>;
   clearMeta: () => Promise<void>;
   updateMetaAndWallets: (meta: GlobalMeta, wallets: Wallet[]) => Promise<void>;
+
+  addPKPWallet: (wallet: PKPWallet) => Promise<void>;
+  getPKPWallet: () => Promise<PKPWallet | null>;
 
   reset: () => Promise<void>;
 }

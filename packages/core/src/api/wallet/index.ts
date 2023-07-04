@@ -6,6 +6,10 @@ import { toAccountIdString, toAccountNameString } from '../account';
 import { Buffer } from 'buffer';
 import { whichAvatar } from './utils';
 import { prepareVault } from '../../utils/vault';
+import { SignSessionKeyResponse } from '@lit-protocol/types';
+import { PKPSuiWallet } from '@yhl125/pkp-sui';
+import { JsonRpcProvider, mainnetConnection } from '@mysten/sui.js';
+import { PKPWallet } from '../../storage/types';
 
 export type CreateWalletParams = {
   token: string;
@@ -55,6 +59,9 @@ export interface IWalletApi {
   ) => Promise<Wallet | null>;
   updateWallet: (params: UpdateWalletParams) => Promise<void>;
   deleteWallet: (walletId: string, token: string) => Promise<void>;
+
+  createPKPWallet: (params: SignSessionKeyResponse) => Promise<string>;
+  getPKPWallet: () => Promise<PKPWallet>;
 }
 
 export class WalletApi implements IWalletApi {
@@ -218,6 +225,27 @@ export class WalletApi implements IWalletApi {
       }
     }
     return false;
+  }
+
+  async createPKPWallet(params: SignSessionKeyResponse): Promise<string> {
+    const wallet = new PKPSuiWallet(
+      {
+        controllerAuthSig: params.authSig,
+        pkpPubKey: params.pkpPublicKey,
+      },
+      new JsonRpcProvider(mainnetConnection)
+    );
+    const address = await wallet.getAddress();
+    await this.storage.addPKPWallet({ ...params, address });
+    return address;
+  }
+
+  async getPKPWallet(): Promise<PKPWallet> {
+    const pkpWallet = await this.storage.getPKPWallet();
+    if (!pkpWallet) {
+      throw new Error('PKP wallet not found');
+    }
+    return pkpWallet;
   }
 }
 

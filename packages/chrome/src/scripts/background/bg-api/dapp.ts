@@ -47,6 +47,11 @@ import {
   DappMessageContext,
   DappSourceContext,
 } from '../types';
+import {
+  pkpSignAndExecuteTransactionBlockDapp,
+  pkpSignMessageDapp,
+  pkpSignTransactionBlockDapp,
+} from '../../../api/pkp/pkpSigns';
 
 export enum ApprovalType {
   PERMISSION = 'PERMISSION',
@@ -102,8 +107,9 @@ export class DappBgApi {
         'permissions are required for params when connecting'
       );
     }
+    const pkpWallet = await this.ctx.storage.getPKPWallet();
     const globalMeta = await this.ctx.storage.loadMeta();
-    if (!globalMeta) {
+    if (!pkpWallet && !globalMeta) {
       const createWalletWindow = this._createPopupWindow('/onboard/welcome');
       await createWalletWindow.show();
       throw new Error('Wallet not initialized');
@@ -121,6 +127,13 @@ export class DappBgApi {
     // only requests from UI have the correct token
     await validateToken(this.ctx.storage, payload.token);
 
+    if (!payload) {
+      throw new Error('params result should not be empty');
+    }
+    approvalSubject.next(payload); // send data to event listener so that the connect function can go on
+  }
+
+  public async callbackPKPApproval(payload: Approval) {
     if (!payload) {
       throw new Error('params result should not be empty');
     }
@@ -214,18 +227,32 @@ export class DappBgApi {
     if (!finalResult.approved) {
       throw new UserRejectionError();
     }
-
-    const txContext = {
-      token: this.authApi.getToken(),
-      network,
-      walletId: connectionContext.target.walletId,
-      accountId: connectionContext.target.accountId,
-    };
-    const result = await this.txApi.signMessage({
-      context: txContext,
-      message: arrayToUint8array(payload.params.message),
-    });
-    return result;
+    const { usePKP } = await this._getAppContext();
+    if (usePKP) {
+      const pkpWallet = await this.ctx.storage.getPKPWallet();
+      if (!pkpWallet) {
+        throw new NotFoundError('PKP wallet not found');
+      }
+      return await pkpSignMessageDapp(
+        {
+          network,
+          message: arrayToUint8array(payload.params.message),
+        },
+        pkpWallet
+      );
+    } else {
+      const txContext = {
+        token: this.authApi.getToken(),
+        network,
+        walletId: connectionContext.target.walletId,
+        accountId: connectionContext.target.accountId,
+      };
+      const result = await this.txApi.signMessage({
+        context: txContext,
+        message: arrayToUint8array(payload.params.message),
+      });
+      return result;
+    }
   }
 
   public async signAndExecuteTransactionBlock(
@@ -266,21 +293,37 @@ export class DappBgApi {
     if (!finalResult.approved) {
       throw new UserRejectionError();
     }
-
-    const token = this.authApi.getToken();
-    const txContext = {
-      token,
-      network,
-      walletId: connectionCtx.target.walletId,
-      accountId: connectionCtx.target.accountId,
-    };
-    const response = await this.txApi.signAndExecuteTransactionBlock({
-      transactionBlock,
-      context: txContext,
-      requestType,
-      options,
-    });
-    return response;
+    const { usePKP } = await this._getAppContext();
+    if (usePKP) {
+      const pkpWallet = await this.ctx.storage.getPKPWallet();
+      if (!pkpWallet) {
+        throw new NotFoundError('PKP wallet not found');
+      }
+      return await pkpSignAndExecuteTransactionBlockDapp(
+        {
+          transactionBlock,
+          network,
+          requestType,
+          options,
+        },
+        pkpWallet
+      );
+    } else {
+      const token = this.authApi.getToken();
+      const txContext = {
+        token,
+        network,
+        walletId: connectionCtx.target.walletId,
+        accountId: connectionCtx.target.accountId,
+      };
+      const response = await this.txApi.signAndExecuteTransactionBlock({
+        transactionBlock,
+        context: txContext,
+        requestType,
+        options,
+      });
+      return response;
+    }
   }
 
   public async signTransactionBlock(
@@ -314,18 +357,33 @@ export class DappBgApi {
       throw new UserRejectionError();
     }
 
-    const token = this.authApi.getToken();
-    const txContext = {
-      token,
-      network,
-      walletId: connectionCtx.target.walletId,
-      accountId: connectionCtx.target.accountId,
-    };
-    const response = await this.txApi.signTransactionBlock({
-      transactionBlock,
-      context: txContext,
-    });
-    return response;
+    const { usePKP } = await this._getAppContext();
+    if (usePKP) {
+      const pkpWallet = await this.ctx.storage.getPKPWallet();
+      if (!pkpWallet) {
+        throw new NotFoundError('PKP wallet not found');
+      }
+      return await pkpSignTransactionBlockDapp(
+        {
+          transactionBlock,
+          network,
+        },
+        pkpWallet
+      );
+    } else {
+      const token = this.authApi.getToken();
+      const txContext = {
+        token,
+        network,
+        walletId: connectionCtx.target.walletId,
+        accountId: connectionCtx.target.accountId,
+      };
+      const response = await this.txApi.signTransactionBlock({
+        transactionBlock,
+        context: txContext,
+      });
+      return response;
+    }
   }
 
   /**
@@ -497,6 +555,21 @@ export class DappBgApi {
     const { context } = payload;
     await this._permissionGuard(context.origin, [Permission.VIEW_ACCOUNT]);
     const appContext = await this._getAppContext();
+    if (appContext.usePKP) {
+      const pkpWallet = await this.ctx.storage.getPKPWallet();
+      if (!pkpWallet) {
+        throw new NotFoundError('PKP wallet not found');
+      }
+      return [
+        {
+          id: '',
+          name: 'PKP',
+          address: pkpWallet.address,
+          pubkey: pkpWallet.pkpPublicKey,
+          hdPath: '',
+        },
+      ];
+    }
     // get accounts under the active wallet
     const result = await this.ctx.storage.getAccounts(appContext.walletId);
     if (!result) {
@@ -532,7 +605,7 @@ export class DappBgApi {
     }
 
     const appContext = await this._getAppContext();
-    const account = await this._getActiveAccount(appContext.accountId);
+    const account = await this._getActiveAccount(appContext);
     const res = await this.permManager.checkPermissions(perms, {
       address: account.address,
       networkId: appContext.networkId,
@@ -545,10 +618,25 @@ export class DappBgApi {
     }
   }
 
-  private async _getActiveAccount(accountId: string): Promise<Account> {
-    const account = await this.ctx.storage.getAccount(accountId);
+  private async _getActiveAccount(
+    appContext: AppContextState
+  ): Promise<Account> {
+    if (appContext.usePKP) {
+      const pkpWallet = await this.ctx.storage.getPKPWallet();
+      if (!pkpWallet) {
+        throw new NotFoundError('PKP wallet not found');
+      }
+      return {
+        id: '',
+        name: 'PKP',
+        address: pkpWallet.address,
+        pubkey: pkpWallet.pkpPublicKey,
+        hdPath: '',
+      };
+    }
+    const account = await this.ctx.storage.getAccount(appContext.accountId);
     if (!account) {
-      throw new Error(`cannot find account, id=${accountId}`);
+      throw new Error(`cannot find account, id=${appContext.accountId}`);
     }
     return account;
   }
@@ -602,7 +690,7 @@ export class DappBgApi {
     sourceCtx: DappSourceContext
   ): Promise<DappConnectionContext> {
     const appContext = await this._getAppContext();
-    const account = await this._getActiveAccount(appContext.accountId);
+    const account = await this._getActiveAccount(appContext);
     return {
       source: sourceCtx,
       target: {

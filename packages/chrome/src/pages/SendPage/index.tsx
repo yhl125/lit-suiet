@@ -5,15 +5,18 @@ import Button from '../../components/Button';
 import { useNavigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { RootState } from '../../store';
-import { useAccount } from '../../hooks/useAccount';
 import Nav from '../../components/Nav';
 import TokenItem from './TokenItem';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import AddressInputPage from './AddressInput';
 import SendConfirm from './SendConfirm';
 import Skeleton from 'react-loading-skeleton';
 import { CoinDto } from '../../hooks/coin/useCoins';
-import { SendAndExecuteTxParams, TxEssentials } from '@suiet/core';
+import {
+  SendAndExecuteTxParams,
+  TxEssentials,
+  calculateCoinAmount,
+} from '@suiet/core';
 import { DEFAULT_SUI_COIN } from '../../constants/coin';
 import { SendData } from './types';
 import { compareCoinAmount } from '../../utils/check';
@@ -23,10 +26,15 @@ import { useApiClient } from '../../hooks/useApiClient';
 import { OmitToken } from '../../types';
 import useSuiBalance from '../../hooks/coin/useSuiBalance';
 import { getTransactionBlock } from '@suiet/core/src/utils/txb-factory';
-import createTransferCoinTxb from './utils/createTransferCoinTxb';
-import useGasBudgetForTransferCoin from './hooks/useGasBudgetForTranferCoin';
-import { calculateCoinAmount } from '@suiet/core';
+import createTransferCoinTxb, {
+  createPKPTransferCoinTxb,
+} from './utils/createTransferCoinTxb';
+import useGasBudgetForTransferCoin, {
+  usePKPGasBudgetForTransferCoin,
+} from './hooks/useGasBudgetForTranferCoin';
 import useCoinsWithSuiOnTop from './hooks/useCoinsWithSuiOnTop';
+import { useGetAddress } from '../../hooks/usePKPWallet';
+import { pkpSignAndExecuteTransactionBlock } from '../../api/pkp/pkpSigns';
 
 enum Mode {
   symbol,
@@ -35,14 +43,14 @@ enum Mode {
 }
 
 const SendPage = () => {
-  const { accountId, walletId, networkId } = useSelector(
+  const { accountId, walletId, networkId, usePKP } = useSelector(
     (state: RootState) => state.appContext
   );
   const { data: network } = useNetwork(networkId);
 
   const apiClient = useApiClient();
   const navigate = useNavigate();
-  const { address } = useAccount(accountId);
+  const address = useGetAddress(usePKP, accountId);
   const { data: suiBalance } = useSuiBalance(address);
   const { data: coinsWithSuiOnTop, loading: coinsLoading } =
     useCoinsWithSuiOnTop(address);
@@ -55,56 +63,92 @@ const SendPage = () => {
     coinAmountWithDecimals: '0',
   });
 
-  const { data: gasBudget } = useGasBudgetForTransferCoin({
-    coinType: sendData.coinType,
-    recipient: sendData.recipientAddress,
-    network,
-    walletId,
-    accountId,
-    gasFeeRatio: 1.2,
-  });
-
-  const submitTransaction = useCallback(async () => {
-    if (!sendData.recipientAddress || !sendData.coinType) return;
-    if (!network) throw new Error('network is undefined');
-
-    const txEssentials: OmitToken<TxEssentials> = {
+  let gasBudget: number;
+  if (usePKP === true) {
+    gasBudget = usePKPGasBudgetForTransferCoin({
+      coinType: sendData.coinType,
+      recipient: sendData.recipientAddress,
+      network,
+      gasFeeRatio: 1.2,
+    }).data;
+  } else {
+    gasBudget = useGasBudgetForTransferCoin({
+      coinType: sendData.coinType,
+      recipient: sendData.recipientAddress,
       network,
       walletId,
       accountId,
-    };
+      gasFeeRatio: 1.2,
+    }).data;
+  }
+  const submitTransaction = useCallback(async () => {
+    if (!sendData.recipientAddress || !sendData.coinType) return;
+    if (!network) throw new Error('network is undefined');
     const coinAmount = calculateCoinAmount(
       sendData.coinAmountWithDecimals,
       selectedCoin.decimals
     );
-    const serializedTxb = await createTransferCoinTxb({
-      apiClient,
-      context: txEssentials,
-      coinType: sendData.coinType,
-      recipient: sendData.recipientAddress,
-      amount: coinAmount,
-    });
-    const txb = getTransactionBlock(serializedTxb);
-    txb.setGasBudget(gasBudget); // set gas budget which is based on estimated gas fee
-    try {
-      await apiClient.callFunc<
-        SendAndExecuteTxParams<string, OmitToken<TxEssentials>>,
-        void
-      >(
-        'txn.signAndExecuteTransactionBlock',
-        {
-          transactionBlock: txb.serialize(),
-          context: txEssentials,
-        },
-        {
-          withAuth: true,
-        }
-      );
-      message.success('Send transaction succeeded');
-      navigate('/transaction/flow');
-    } catch (e: any) {
-      console.error(e);
-      message.error(`Send transaction failed: ${e?.message}`);
+    if (usePKP === true) {
+      const serializedTxb = await createPKPTransferCoinTxb({
+        apiClient,
+        network,
+        coinType: sendData.coinType,
+        recipient: sendData.recipientAddress,
+        amount: coinAmount,
+      });
+      const txb = getTransactionBlock(serializedTxb);
+      console.log(txb);
+      txb.setGasBudget(gasBudget); // set gas budget which is based on estimated gas fee
+      try {
+        await pkpSignAndExecuteTransactionBlock(
+          {
+            transactionBlock: txb.serialize(),
+            network,
+          },
+          apiClient
+        );
+        message.success('Send transaction succeeded');
+        navigate('/transaction/flow');
+      } catch (e: any) {
+        console.error(e);
+        message.error(`Send transaction failed: ${e?.message}`);
+      }
+    } else {
+      const txEssentials: OmitToken<TxEssentials> = {
+        network,
+        walletId,
+        accountId,
+      };
+
+      const serializedTxb = await createTransferCoinTxb({
+        apiClient,
+        context: txEssentials,
+        coinType: sendData.coinType,
+        recipient: sendData.recipientAddress,
+        amount: coinAmount,
+      });
+      const txb = getTransactionBlock(serializedTxb);
+      txb.setGasBudget(gasBudget); // set gas budget which is based on estimated gas fee
+      try {
+        await apiClient.callFunc<
+          SendAndExecuteTxParams<string, OmitToken<TxEssentials>>,
+          undefined
+        >(
+          'txn.signAndExecuteTransactionBlock',
+          {
+            transactionBlock: txb.serialize(),
+            context: txEssentials,
+          },
+          {
+            withAuth: true,
+          }
+        );
+        message.success('Send transaction succeeded');
+        navigate('/transaction/flow');
+      } catch (e: any) {
+        console.error(e);
+        message.error(`Send transaction failed: ${e?.message}`);
+      }
     }
   }, [gasBudget, sendData, selectedCoin]);
 
