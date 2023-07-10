@@ -6,7 +6,7 @@
 
 <center>
 <a href="http://www.youtube.com/watch?feature=player_embedded&v=IhUsXxZzumE" target="_blank">
- <img src="https://img.youtube.com/vi/IhUsXxZzumE/default.jpg" alt="Watch the video" width="480" height="360" />
+ <img src="https://img.youtube.com/vi/IhUsXxZzumE/maxresdefault.jpg" alt="Watch the video" width="720" height="405" />
 </a>
 </center>
 
