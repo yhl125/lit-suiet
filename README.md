@@ -4,11 +4,21 @@
 > Lit protocol is in a developer preview state. The data on the Serrano Testnet is not persistent and may be erased at any time.
 > Do not store anything of value
 
+## Demo Video
+
+---
+
+<br>
 <center>
 <a href="http://www.youtube.com/watch?feature=player_embedded&v=IhUsXxZzumE" target="_blank">
  <img src="https://img.youtube.com/vi/IhUsXxZzumE/maxresdefault.jpg" alt="Watch the video" width="720" height="405" />
 </a>
 </center>
+<br>
+
+## About Lit-Suiet
+
+---
 
 Lit Suiet is a seedless wallet built on Sui blockChain with Lit protocol PKP(Programmable Key Pairs).  
 With Lit Protocol PKP User’s can Login or SignUp with Google.  
