@@ -40,7 +40,7 @@ npm install
 Run the following command at the root path of the project
 
 ```bash
-npm start
+npm run build
 ```
 
 Then load the extension dist folder `packages/chrome/dist` in Chrome [#detail](https://developer.chrome.com/docs/extensions/mv3/faq/#:~:text=You%20can%20start%20by%20turning,a%20packaged%20extension%2C%20and%20more.)
